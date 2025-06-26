@@ -334,23 +334,18 @@
         }
 
         public function add_gauntlet_level($gauntlet) {
-           $levels_gauntlet = $this->connection->prepare("SELECT * FROM gauntlets WHERE ID = :gauntlet");
+            $levels_gauntlet = $this->connection->prepare("SELECT * FROM gauntlets WHERE ID = :gauntlet");
             $levels_gauntlet->execute([":gauntlet" => $gauntlet]);
-            $levels_gauntlet = $levels_gauntlet->fetch(PDO::FETCH_ASSOC);
-            
-            $levels_data = array();
-            $i = 0;
+            $levels_gauntlet = $levels_gauntlet->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($levels_gauntlet as &$level) {
-                if ($i == 0) continue;
+                for ($x = 1; $x <= 5; $x++) {
+                    $get_data = $this->connection->prepare('SELECT ID FROM gauntlets WHERE level' . $x . ' = :levelID');
+                    $get_data->execute([':levelID' => $level['level' . $x]]);
+                    $get_data = $get_data->fetch(PDO::FETCH_ASSOC);
                 
-                $get_data = $this->connection->prepare('SELECT ID FROM gauntlets WHERE level' . $i . ' = :levelID');
-                $get_data->execute([':levelID' => $level['levelID']]);
-                $get_data = $get_data->fetch(PDO::FETCH_ASSOC);
-
-                $this->update_gauntlet_level($get_data['ID'], $i, $level['levelID']);
-
-                $i++;
+                    $this->update_gauntlet_level($get_data['ID'], $x, $level['level' . $x]);
+                }
             }
             
             return true;
