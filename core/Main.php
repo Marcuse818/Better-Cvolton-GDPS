@@ -150,23 +150,6 @@
             return $list_levels_name->fetchColumn();
         }
         
-        public function get_comment_color($accountID) {
-            if(!is_numeric($accountID)) return false;
-    
-            $roleID = $this->connection->prepare("SELECT roleID FROM roleassign WHERE accountID = :accountID");
-            $roleID->execute([':accountID' => $accountID]);
-
-            if ($roleID->rowCount() == 0) return false;
-
-            $roleID = $roleID->fetch();
-
-            $commentColor = $this->connection->prepare("SELECT commentColor FROM roles WHERE roleID = " . (int) $roleID["roleID"]);
-            $commentColor->execute();
-            $commentColor = $commentColor->fetch();
-    
-            return $commentColor["commentColor"];
-        }
-
         public function get_post_id() {
             if(!empty($_POST["udid"]) && $_POST['gameVersion'] < 20 && self::$unregisteredSubmissions) 
             {
