@@ -299,8 +299,8 @@
 		    if(!is_numeric($accountID)) return false;
 		    
 		    $state = $this->get_state($feat);
-            	    $featured = $state["featured"];
-           	    $epic = $state["epic"];
+            $featured = $state["featured"];
+           	$epic = $state["epic"];
             
 		    $rate_level = $this->connection->prepare("INSERT INTO sendLevel (accountID, levelID, difficulty, stars, featured, state, auto, demon, timestamp) VALUES (:account, :level, :diff, :stars, :featured, :state, :auto, :demon, :timestamp)");
 		    $rate_level->execute([':account' => $accountID, ':level' => $levelID, ':diff' => $difficulty, ':stars' => $stars, ':featured' => $featured, ':state' => $epic, ':auto' => $auto, ':demon' => $demon, ':timestamp' => time()]);

@@ -11,38 +11,30 @@
 		}
 		
 		public function get_difficulty($diff, $auto, $demon) {
-			if($auto != 0) 
-			{
-				return "Auto";
-			}
-			else if($demon != 0)
-			{
-				return "Demon";
-			}
-			else
-			{
-				switch($diff) {
-					case 0:
-						return "N/A";
+			if($auto != 0) return "Auto";
+			if($demon != 0) return "Demon";
+			
+			switch($diff) {
+				case 0:
+					return "N/A";
 					
-					case 10:
-						return "Easy";
+				case 10:
+					return "Easy";
 					
-					case 20:
-						return "Normal";
+				case 20:
+					return "Normal";
 					
-					case 30:
-						return "Hard";
+				case 30:
+					return "Hard";
 					
-					case 40:
-						return "Harder";
+				case 40:
+					return "Harder";
 					
-					case 50:
-						return "Insane";
+				case 50:
+					return "Insane";
 					
-					default:
-						return "Unknown";
-			}
+				default:
+					return "Unknown";
 		}
 	}
 
@@ -183,8 +175,6 @@
 			$id = $id->fetchColumn();
 			$id += 1;
 			
-			// $songID = $this->checkSong($id);
-			
 			$query = $this->connection->prepare("INSERT INTO songs (ID, name, authorID, authorName, size, download, hash) VALUES (:ID, :name, '9', :author, :size, :download, :hash)");
 			$query->execute([':ID' => $id, ':name' => $name, ':download' => $song, ':author' => $author, ':size' => $size, ':hash' => $hash]);
 		    
@@ -193,38 +183,7 @@
 		
 		return "-2";
 	}
-    /*
-    public function checkSong($songID) {
-        $code = $this->getHTTPResponseStatusCode("https://geometrydashfiles.b-cdn.net/music/" . $songID . ".ogg");
-        
-        if ($code == "200 OK") 
-        {
-            $songID = $songID * 2;
-        
-            return $songID;
-        }
-        else 
-        {
-            $code = $this->getHTTPResponseStatusCode("https://www.newgrounds.com/audio/listen/" . $songID);
-        
-            if ($code == "200 OK") $songID = $songID * 2;
-        
-            return $songID;
-        }
-    }
     
-    public function getHTTPResponseStatusCode($url)
-    {
-        $status = null;
-
-        $headers = @get_headers($url, 1);
-        if (is_array($headers)) {
-            $status = substr($headers[0], 9);
-        }
-
-        return $status;
-    }
-	*/
 	public function get_file_info($url) {
 		$ch = curl_init($url);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
@@ -238,9 +197,5 @@
 		curl_close($ch);
 		
 		return ['size' => $size, 'type' => $mime];
-	}
-
-	public static function is_ascii_string($string) {
-		return mb_detect_encoding($string, ["ASCII", "UTF-8"], true) == "ASCII";
 	}
 }
