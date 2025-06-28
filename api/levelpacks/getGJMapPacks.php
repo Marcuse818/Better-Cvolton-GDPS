@@ -8,7 +8,7 @@
 
 	$page = ExploitPatch::remove($_POST["page"]);
 
-	$loadMapPacks = $MapPack->getData(0, $page);
+	$loadMapPacks = $MapPack->get_data($page);
 
 	exit($loadMapPacks);
 ?>

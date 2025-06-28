@@ -12,7 +12,8 @@
 
     class Lists implements ListInterface {
         private $connection, $main;
-        public $followed, $difficulty, $demon_filter, $star, $featured, $string;
+        public $followed, $difficulty, $demon_filter, $star, $levels_list, $secret, $featured, $string;
+        public $list_description, $list_version, $list_name, $original, $unlisted;
 
         public function __construct() {
             $database = new Database();
@@ -162,6 +163,51 @@
             }
 
             return "-1";
+        }
+
+        public function upload_list(int $account_id, int $list_id): string {
+            if ($this->secret != "Wmfd2893gb7") return "-100";
+            if (count(explode(",", $this->levels_list)) == 0) return "-6";
+            if (!is_numeric($account_id)) return "-9";
+
+            if ($list_id != 0) {
+                $list = $this->connection->prepare("SELECT * FROM lists WHERE listID = :listID AND accountID = :accountID");
+                $list->execute([":listID"=> $list_id, ":accountID" => $account_id]);
+                $list = $list->fetch();
+
+                if (!empty($list)) {
+                    $list = $this->connection->prepare("UPDATE lists SET listDesc = :listDesc, listVersion = :listVersion, listlevels = :listlevels, starDifficulty = :difficulty, original = :original, unlisted = :unlisted, updateDate = :timestamp WHERE listID = :listID");
+                    $list->execute([
+                        ':listID' => $list_id, 
+                        ':listDesc' => $this->list_description, 
+                        ':listVersion' => $this->list_version, 
+                        ':listlevels' => $this->levels_list, 
+                        ':difficulty' => $this->difficulty, 
+                        ':original' => $this->original, 
+                        ':unlisted' => $this->unlisted, 
+                        ':timestamp' => time()
+                    ]);
+
+                    return $list_id;
+                }
+            }
+
+            $list = $this->connection->prepare('INSERT INTO lists (listName, listDesc, listVersion, accountID, listlevels, starDifficulty, original, unlisted, uploadDate) VALUES (:listName, :listDesc, :listVersion, :accountID, :listlevels, :difficulty, :original, :unlisted, :timestamp)');
+            $list->execute([
+                ':accountID' => $account_id,
+                ':listName' => $this->list_name,
+                ':listDesc' => $this->list_description, 
+                ':listVersion' => $this->list_version, 
+                ':listlevels' => $this->levels_list, 
+                ':difficulty' => $this->difficulty, 
+                ':original' => $this->original, 
+                ':unlisted' => $this->unlisted, 
+                ':timestamp' => time()
+            ]);
+            
+            $list_id = $this->connection->lastInsertId();
+
+            return $list_id;
         }
     }
 ?>

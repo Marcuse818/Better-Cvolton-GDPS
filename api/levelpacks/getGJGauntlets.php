@@ -1,11 +1,11 @@
 <?php
 	chdir(dirname(__FILE__));
 
-	include "../../core/LevelPack.php";
+	include "../../core/GauntletPack.php";
 
-	$Gauntlet = new Gauntlets();
+	$Gauntlet = new GauntletPack();
 
-	$loadGauntlet = $Gauntlet->getData();
+	$loadGauntlet = $Gauntlet->get_data();
 
 	exit($loadGauntlet);
 ?>
