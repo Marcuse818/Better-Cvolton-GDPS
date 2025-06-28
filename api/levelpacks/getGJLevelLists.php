@@ -1,7 +1,7 @@
 <?php
 	chdir(dirname(__FILE__));
 	
-	require_once "../../core/LevelPack.php";
+	require_once "../../core/ListPack.php";
 
 	require_once "../../core/lib/GJPCheck.php";
 	require_once "../../core/lib/exploitPatch.php";
@@ -19,7 +19,7 @@
 	$List->featured = ExploitPatch::remove($_POST["featured"]);
 	$List->string = ExploitPatch::remove($_POST["str"]);
 	
-	$getList = $List->getData($accountID, $page, $type);
+	$getList = $List->get_data($accountID, $page, $type);
 	
 	exit($getList);
 ?>

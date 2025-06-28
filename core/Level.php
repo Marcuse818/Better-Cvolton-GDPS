@@ -136,7 +136,7 @@
                     $daily = 0;
             }
             
-             $levelData = ($daily == 1) ?
+            $levelData = ($daily == 1) ?
                 $this->connection->prepare("SELECT levels.*, users.userName, users.extID FROM levels LEFT JOIN users ON levels.userID = users.userID WHERE levelID = :levelID") :
                 $this->connection->prepare("SELECT * FROM levels WHERE levelID = :levelID");
             $levelData->execute([':levelID' => $levelID]);
@@ -164,7 +164,7 @@
 		    
                 if ($this->gameVersion > 19)
                 {
-                    $xor = base64_encode(XORCipher::cipher($password, 26364));
+                    if ($password != 0) $xor = base64_encode(XORCipher::cipher($password, 26364));
                 }
                 else
                 {

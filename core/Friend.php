@@ -2,7 +2,7 @@
     require_once __DIR__."/lib/Database.php";
     require_once __DIR__."/lib/Lib.php";
 
-    interface Friendships {
+    interface FriendInterface {
         public function accept(int $accountID, int $requestID): string;
         public function block(int $accountID, int $targetAccountID): string;
         public function read(int $accountID, int $requestID): string;
@@ -14,7 +14,7 @@
         public function getDataList(int $accountID, int $type): string;
     }
 
-    class Friend implements Friendships {
+    class Friend implements FriendInterface {
         protected $connection;
         protected $Lib, $Database;
 
