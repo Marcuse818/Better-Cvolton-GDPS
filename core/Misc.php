@@ -69,9 +69,9 @@
         }
 
         public function getUrl(): string {
-            $url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]";
+            $url = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https" : "http";
             
-            return $url;
+            return dirname($url . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]");
         }
 
         public function getSong(int $songID): string {
