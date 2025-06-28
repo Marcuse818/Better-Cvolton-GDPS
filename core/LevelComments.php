@@ -16,7 +16,8 @@
         private $mode_column, $filter_column, $filter_to_filter, $display_level_id, $filter_id, $user_list_join, $user_list_where;
 
         public function __construct() {
-            $this->connection = new Database()->open_connection();
+            $database = new Database();
+            $this->connection = $database->open_connection();
             $this->lib = new Lib();
             $this->main = new Main();
             $this->upload_date = time();
@@ -62,7 +63,7 @@
             $comments = $comments->fetchAll();
             
             foreach ($comments as $comment) {
-                if ($comments['commentID'] != 0) {
+                if ($comment['commentID'] != 0) {
                     $this->upload_date = $this->lib->make_time($comment['timestamp']);
                     $comment_text = ($this->game_version < 20) ? base64_decode($comment['comment']) : $comment['comment'];  
 

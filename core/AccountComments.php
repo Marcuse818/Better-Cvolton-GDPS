@@ -15,7 +15,8 @@
         public $upload_date;
 
         public function __construct() {
-            $this->connection = new Database()->open_connection();
+            $database = new Database();
+            $this->connection = $database->open_connection();
             $this->lib = new Lib();
             $this->upload_date = time();
         }
@@ -35,7 +36,7 @@
             $comments_count = $comments_count->fetchColumn();
 
             foreach ($comments as $comment) {
-                if ($comments['commentID'] != 0) 
+                if ($comment['commentID'] != 0) 
                 {
                     $this->upload_date = $this->lib->make_time($comment['timestamp']);
                     $comment_string .= "2~".$comment["comment"]."~3~".$comment["userID"]."~4~".$comment["likes"]."~5~0~7~".$comment["isSpam"]."~9~".$this->upload_date."~6~".$comment["commentID"]."|";

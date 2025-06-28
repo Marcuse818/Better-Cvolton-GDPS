@@ -216,8 +216,8 @@
             $dailyLevelID = $level_daily->fetchColumn();
             $midnight = ($type == 1) ? strtotime('next monday') : strtotime('tomorrow 00:00:00');
 
-	        if($type == 1) $dailyID += 100001;
-            if ($type == 2) $dailyID += 200001;
+	        if($type == 1) $dailyLevelID += 100001;
+            if ($type == 2) $dailyLevelID += 200001;
             
 	        $timeleft = $midnight - time();
             return $dailyLevelID."|".$timeleft;
