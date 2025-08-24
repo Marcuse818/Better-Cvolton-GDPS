@@ -9,7 +9,7 @@
 
 
 	$Main 		= new Main();
-	$Level 		= new Levels();
+	$Level 		= new Level();
     
     $gjp2check = isset($_POST['gjp2']) ? $_POST['gjp2'] : $_POST['gjp'];
     

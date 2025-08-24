@@ -6,7 +6,7 @@
 	require_once "../../core/lib/GJPCheck.php";
 	require_once "../../core/lib/exploitPatch.php";
 
-	$Level 			= new Levels();
+	$Level 			= new Level();
 
 	if (isset($_POST['levelDesc']) && isset($_POST['levelID'])) 
 	{

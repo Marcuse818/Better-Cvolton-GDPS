@@ -7,7 +7,7 @@
     require_once __DIR__."/lib/exploitPatch.php";
     require_once __DIR__."/lib/generateHash.php";
 
-    interface Level {
+    interface LevelInterface {
         public function existLevel(string $levelName, int $userID): int;
         public function delete(int $userID, int $levelID): string;
         public function download(int $accountID, int $levelID, $inc, $extras, $hostname): string;
@@ -53,7 +53,7 @@
         ): int;
     }
     
-    class Levels implements Level {
+    class Level implements LevelInterface {
         protected $connection;
         protected $Main, $Database, $Lib;
 

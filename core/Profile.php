@@ -5,7 +5,7 @@
     require_once __DIR__."/lib/GJPCheck.php";
     require_once __DIR__."/lib/Lib.php";
     
-    interface Profile {
+    interface AccountInterface {
         public function getData(int $accountID, int $targetAccountID): string;
         public function getUsers(string $string, int $page): string;
         public function update(
@@ -18,35 +18,8 @@
             string $twitter
         ): string;
     }
-
-    interface RequestMod {
-        public function request(int $accountID): string;
-    }
-
-    class Request implements RequestMod {
-        protected $connection;
-        protected $Main, $Lib, $DB;
-
-        public function __construct() {
-            $Database = new Database();
-            $this->Main = new Main();
-            $this->Lib = new Lib();
-
-            $this->connection = $Database->open_connection();
-        }
-
-        public function request(int $accountID): string {
-            if ($this->Main->getRolePermission($accountID, "actionRequestMod") >= 1)
-            {
-                if ($this->Main->getRolePermission($accountID, "modBadgeLevel") >= 3) return 3;
-                return $this->Main->getRolePermission($accountID, "modBadgeLevel"); 
-            }
-
-            return "-1";
-        }
-    }
     
-    class Account implements Profile {
+    class Account implements AccountInterface {
         protected $connection;
         protected $Main, $Lib, $Database;
 

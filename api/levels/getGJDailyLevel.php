@@ -3,7 +3,7 @@
 
 	require_once "../../core/Level.php";
 
-	$Level = new Levels();
+	$Level = new Level();
 
 	$type = !empty($_POST['weekly']) ? $_POST['weekly'] : 0;
 

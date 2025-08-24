@@ -9,7 +9,7 @@
 	require_once '../../core/lib/Lib.php';
 
 	$Main 		= new Main();
-	$Level 		= new Levels();
+	$Level 		= new Level();
 	$Lib		= new Lib();
 
 	$userName 				= ExploitPatch::charclean($_POST['userName']);

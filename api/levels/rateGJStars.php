@@ -8,7 +8,7 @@
 	require_once "../../core/lib/exploitPatch.php";
 
 	$main 		= new Main();
-	$Level 		= new Levels();
+	$Level 		= new Level();
     
     $gjp2check = isset($_POST['gjp2']) ? $_POST['gjp2'] : $_POST['gjp'];
     

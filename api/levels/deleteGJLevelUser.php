@@ -8,7 +8,7 @@
 	require_once "../../core/Level.php";
 	
 	$Main 		= new Main();
-	$Level 		= new Levels();
+	$Level 		= new Level();
 	
 	if(!empty($_POST['levelID']))
 	{

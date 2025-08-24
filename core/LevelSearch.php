@@ -5,7 +5,7 @@
     require_once __DIR__."/lib/Database.php";
     require_once __DIR__."/lib/generateHash.php";
 
-    interface Search {
+    interface SearchInterface {
         public function search(
             int $accountID, 
             int $page, 
@@ -35,7 +35,7 @@
         ): string;
     }
     
-    class LevelSearch implements Search {
+    class LevelSearch implements SearchInterface {
         protected $connection; 
         protected $Main, $Level, $Database;
         

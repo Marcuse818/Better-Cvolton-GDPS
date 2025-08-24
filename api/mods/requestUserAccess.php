@@ -1,7 +1,7 @@
 <?php
 	chdir(dirname(__FILE__));
 
-	require_once "../../core/Profile.php";
+	require_once "../../core/Request.php";
 	require_once "../../core/lib/GJPCheck.php";
 
 	$Request 	= new Request();
@@ -10,4 +10,5 @@
     
 	$requestAccess = $Request->request($accountID);
 
-	echo $requestAccess;
+	exit($requestAccess);
+?>

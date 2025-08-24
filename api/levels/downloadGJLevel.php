@@ -9,7 +9,7 @@
 
     $Main 		= new Main();
 	$Lib 		= new Lib();
-	$Level 		= new Levels();
+	$Level 		= new Level();
 
 	if (!empty($_POST['levelID']) && $_POST['levelID'] != "") 
 	{

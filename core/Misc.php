@@ -6,14 +6,14 @@
 
     require_once __DIR__."/../config/topArtists.php";
 
-    interface Miscs {
+    interface MiscInterface {
         public function like(int $itemID, int $type, int $like, $hostname): string;
         public function getUrl(): string;
         public function getSong(int $songID): string;
         public function getArtists(int $page, string $url, string $request): string;
     }
 
-    class Misc extends ConfigArtists implements Miscs {
+    class Misc extends ConfigArtists implements MiscInterface {
         protected $connection;
         protected $Main, $SongReupload, $Database;
 

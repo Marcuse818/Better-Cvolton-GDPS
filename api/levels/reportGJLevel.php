@@ -7,7 +7,7 @@
 	require_once "../../core/lib/exploitPatch.php";
 
 	$Main 		= new Main();
-	$Level 		= new Levels();
+	$Level 		= new Level();
 
 	if($_POST["levelID"])
 	{
