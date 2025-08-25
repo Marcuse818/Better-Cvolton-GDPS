@@ -153,7 +153,7 @@
         }
 
         public function getArtists(int $page, string $url, string $request): string {
-            $page = $page * 2;
+            $page *= 2;
 
             if ($this->redirect == 1) 
             {

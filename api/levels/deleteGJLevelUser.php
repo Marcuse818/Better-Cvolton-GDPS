@@ -18,9 +18,8 @@
 
 		$deleteLevel = $Level->delete($userID, $levelID);
 		
-		echo $deleteLevel;
+		exit($deleteLevel);
 	} 
-	else
-	{
-		echo -1;
-	}
+	
+	exit("-1");
+?>

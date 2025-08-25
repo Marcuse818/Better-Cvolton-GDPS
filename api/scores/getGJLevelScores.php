@@ -23,4 +23,5 @@
 
 	$getLevelScores = $Level->getData($accountID, $levelID, $type);
 
-	echo $getLevelScores;
+	exit($getLevelScores);
+?>

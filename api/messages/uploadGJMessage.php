@@ -26,9 +26,8 @@
 
         $uploadMessage = $Message->upload($accountID, $userID, 0, $toAccountID, '', '', $subject, $body, $secret);
 
-        echo $uploadMessage;
+        exit($uploadMessage);
     }
-    else
-    {
-        echo -1;
-    }
+    
+    exit("-1");
+?>

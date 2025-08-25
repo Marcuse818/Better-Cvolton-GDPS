@@ -16,9 +16,8 @@
 
 		$getArtist = $Misc->getArtists($page, $url, $request);
 		
-		echo $getArtist;
+		exit($getArtist);
 	} 
-	else
-	{
-		echo -1;
-	}
+
+	exit("-1");
+?>

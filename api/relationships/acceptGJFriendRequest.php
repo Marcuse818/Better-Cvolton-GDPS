@@ -16,9 +16,8 @@
 
 		$acceptFriendRequest = $Friend->accept($accountID, $requestID);
 
-		echo $acceptFriendRequest;
+		exit($acceptFriendRequest);
 	} 
-	else
-	{
-		echo -1;
-	}
+
+	exit("-1");
+?>

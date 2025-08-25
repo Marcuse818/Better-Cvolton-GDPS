@@ -15,9 +15,8 @@
 
 		$unblockUser = $Friend->unblock($accountID, $targetAccountID);
 
-		echo $unblockUser;
+		exit($unblockUser);
 	}
-	else
-	{
-		echo -1;
-	}
+
+	exit("-1");
+?>

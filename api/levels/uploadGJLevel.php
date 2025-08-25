@@ -90,5 +90,5 @@
 		$password
 	);
 
-	echo $uploadLevel;
+	exit($uploadLevel);
 ?>

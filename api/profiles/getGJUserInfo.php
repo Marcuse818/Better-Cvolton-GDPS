@@ -14,9 +14,8 @@
 		
 		$getAccountInfo = $Account->getData($accountID, $targetAccountID);
 
-		echo $getAccountInfo;
+		exit($getAccountInfo);
 	}
-	else
-	{
-		echo -1;
-	}
+
+	exit("-1");
+?>

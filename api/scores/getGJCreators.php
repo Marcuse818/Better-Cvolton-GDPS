@@ -14,9 +14,8 @@
 
 		$getCreators = $Creators->getData($accountID, 0, $type);
 
-		echo $getCreators;
+		exit($getCreators);
 	}
-	else
-	{
-		echo -1;
-	}
+
+	exit("-1");
+?>

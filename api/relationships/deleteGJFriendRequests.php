@@ -15,10 +15,8 @@
 
 		$deleteFriendRequest = $Friend->delete($accountID, $targetAccountID, $isSender);
 
-		echo $delete_friend_request;
+		exit($deleteFriendRequest);
 	}
-	else
-	{
-		echo -1;
-	}
+
+	exit("-1");
 ?>

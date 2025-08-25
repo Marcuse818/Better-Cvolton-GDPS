@@ -15,9 +15,8 @@
 
 		$getUserList = $Friend->getDataList($accountID, $type);
 
-		echo $getUserList;
+		exit($getUserList);
 	}
-	else 
-	{
-		echo -1;
-	}
+
+	exit("-1");
+?>

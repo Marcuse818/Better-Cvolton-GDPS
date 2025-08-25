@@ -48,9 +48,8 @@
 		
 		$updateUserScore = $Level->update($accountID, $userID, $hostname);
 
-		echo $updateUserScore;
+		exit($updateUserScore);
 	}
-	else
-	{
-		echo -1;
-	}
+	
+	exit("-1");
+?>

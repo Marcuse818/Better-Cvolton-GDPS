@@ -84,4 +84,5 @@
 		$string
 	);
     
-	echo $levelSearch;
+	exit($levelSearch);
+?>

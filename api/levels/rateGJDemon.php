@@ -21,10 +21,8 @@
 	
 		$rateDemon = $Level->rateDemon($accountID, $levelID, $rating);
 		
-		echo $rateDemon;
+		exit($rateDemon);
 	}
-	else
-	{
-		echo -1;
-	}
+	
+	exit("-1");
 ?>

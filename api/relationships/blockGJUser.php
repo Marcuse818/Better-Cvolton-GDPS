@@ -15,10 +15,8 @@
 
 		$blockUser = $Friend->block($accountID, $targetAccountID);
 
-		echo $blockUser;
+		exit($blockUser);
 	} 
-	else
-	{
-		echo -1;
-	}
+
+	exit("-1");
 ?>

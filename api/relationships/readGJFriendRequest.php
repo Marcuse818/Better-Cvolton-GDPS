@@ -15,10 +15,8 @@
 
 		$readFriendRequest = $Friend->read($accountID, $requestID);
 
-		echo $readFriendRequest;
+		exit($readFriendRequest);
 	}
-	else
-	{
-		echo -1;
-	}
+
+	exit("-1");
 ?>

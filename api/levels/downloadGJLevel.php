@@ -24,9 +24,8 @@
 		
 		$downloadLevel = $Level->download($accountID, $levelID, $inc, $extras, $hostname);
 		
-		echo $downloadLevel;
+		exit($downloadLevel);
 	} 
-	else 
-	{
-		echo -1;
-	} 
+	
+	exit("-1");
+?>

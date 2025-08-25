@@ -9,4 +9,5 @@
 
 	$dailyLevel = $Level->getDaily($type);
 
-	echo $dailyLevel;
+	exit($dailyLevel);
+?>

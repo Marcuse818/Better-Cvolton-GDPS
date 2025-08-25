@@ -15,9 +15,8 @@
 
 		$downloadMessage = $Message->download($accountID, $messageID, $isSender);
 
-		echo $downloadMessage;
+		exit($downloadMessage);
 	}
-	else
-	{
-		echo -1;
-	}
+
+	exit("-1");
+?>

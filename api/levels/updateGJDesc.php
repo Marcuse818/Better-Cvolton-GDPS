@@ -16,7 +16,7 @@
 		if (isset($_POST['udid']) && !empty($_POST['udid'])) 
 		{
 			$accountID = ExploitPatch::remove($_POST["udid"]);
-			if (is_numeric($accountID)) exit(-1);
+			if (is_numeric($accountID)) exit("-1");
 		} 
 		else 
 		{
@@ -25,9 +25,8 @@
 
 		$updateDescription = $Level->updateDesc($accountID, $levelID, $levelDescription);
 
-		echo $updateDescription;
+		exit($updateDescription);
 	}
-	else 
-	{
-		echo -1;
-	}
+	
+	exit("-1");
+?>

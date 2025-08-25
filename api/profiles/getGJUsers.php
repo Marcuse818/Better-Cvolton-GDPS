@@ -14,9 +14,8 @@
 
 		$getUsers = $Account->getUsers($string, $page);
 
-		echo $getUsers;
+		exit($getUsers);
 	}
-	else
-	{
-		echo -1;
-	}
+
+	exit("-1");
+?>

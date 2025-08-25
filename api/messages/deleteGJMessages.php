@@ -16,9 +16,8 @@
 
 		$deleteMessage = $Message->delete($accountID, 0, 0, 0, $messageID, $messages);
 
-		echo $deleteMessage;
+		exit($deleteMessage);
 	}
-	else
-	{
-		echo -1;
-	}
+	
+	exit("-1");
+?>

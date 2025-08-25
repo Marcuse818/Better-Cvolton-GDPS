@@ -17,9 +17,8 @@
 
 		$likeItem = $Misc->like($itemID, $type, $like, $hostname);
 
-		echo $likeItem;
+		exit($likeItem);
 	} 
-	else
-	{
-		echo -1;
-	}
+
+	exit("-1");
+?>

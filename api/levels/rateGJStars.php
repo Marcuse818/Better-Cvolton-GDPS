@@ -20,9 +20,8 @@
 		
 		$rateLevel = $Level->rateStar($accountID, $levelID, $starStars);
 
-		echo $rateLevel;	
+		exit($rateLevel);	
 	}
-	else
-	{
-		echo -1;
-	}
+	
+	exit("-1");
+?>

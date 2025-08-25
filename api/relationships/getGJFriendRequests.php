@@ -18,9 +18,8 @@
 
 		$getFriendRequest = $Friend->getData($accountID, $page, $getSent);
 
-		echo $getFriendRequest;
+		exit($getFriendRequest);
 	}
-	else
-	{
-		echo -1;
-	}
+
+	exit("-1");
+?>

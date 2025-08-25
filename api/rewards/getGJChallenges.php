@@ -17,9 +17,8 @@
 
 		$getChallenges = $Challenges->getData($accountID, $udid, $check);
 
-		echo $getChallenges;
+		exit($getChallenges);
 	}
-	else 
-	{
-		echo -1;
-	}
+
+	exit("-1");
+?>

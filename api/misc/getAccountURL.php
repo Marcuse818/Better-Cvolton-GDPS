@@ -5,4 +5,5 @@
 
     $Misc = new Misc();
 
-    echo $Misc->getUrl();
+    exit($Misc->getUrl());
+?>

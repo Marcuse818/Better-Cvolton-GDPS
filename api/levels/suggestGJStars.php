@@ -22,9 +22,8 @@
 
 		$suggestStars = $Level->rateSuggest($accountID, $levelID, $starStars, $feature, $difficulty);
 
-		echo $suggestStars;
+		exit($suggestStars);
 	}
-	else
-	{
-		echo -1;
-	}
+	
+	exit("-1");
+?>

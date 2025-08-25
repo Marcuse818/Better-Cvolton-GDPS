@@ -13,9 +13,8 @@
 
 		$songInfo = $Misc->getSong($songID);
 
-		echo $songInfo;
+		exit($songInfo);
 	}
-	else
-	{
-		echo -1;
-	}
+
+	exit("-1");
+?>

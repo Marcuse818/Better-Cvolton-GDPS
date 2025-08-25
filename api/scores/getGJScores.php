@@ -23,4 +23,5 @@
 
 	$getScores = $Leaderboard->getData($accountID, 0, $type, 'none', 0, 0, $count);
 
-	echo $getScores;
+	exit($getScores);
+?>

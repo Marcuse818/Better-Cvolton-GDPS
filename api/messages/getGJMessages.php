@@ -13,5 +13,5 @@
 
 	$getMessages = $message->getData($accountID, 0, $page, $getSent);
 
-	echo $getMessages;
+	exit($getMessages);
 ?>

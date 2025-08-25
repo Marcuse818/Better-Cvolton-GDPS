@@ -15,10 +15,8 @@
 
 		$removeFriend = $Friend->remove($accountID, $targetAccountID);
 
-		echo $removeFriend;
+		exit($removeFriend);
 	}
-	else
-	{
-		echo -1;
-	}
+
+	exit("-1");
 ?>

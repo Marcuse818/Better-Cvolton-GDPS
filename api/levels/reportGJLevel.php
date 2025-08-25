@@ -16,9 +16,7 @@
 		
 		$reportLevel = $Level->report($levelID, $hostname);
 		
-		echo $reportLevel;
+		exit($reportLevel);
 	} 
-	else
-	{
-		echo -1;
-	}
+	exit("-1");
+?>

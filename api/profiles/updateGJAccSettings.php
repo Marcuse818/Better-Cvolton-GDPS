@@ -18,4 +18,5 @@
 
     $updateAccountSettings = $Account->update($accountID, $privateMessage, $privateFriend, $privateHistory, $youtube, $twitch, $twitter);
 
-    echo $updateAccountSettings;
+    exit($updateAccountSettings);
+?>

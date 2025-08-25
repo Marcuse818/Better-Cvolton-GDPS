@@ -18,4 +18,5 @@
 
 	$getPlatformerScores = $Platformer->getData($accountID, $levelID, $type, $mode, $time, $points);
 
-	echo $getPlatformerScores;
+	exit($getPlatformerScores);
+?>

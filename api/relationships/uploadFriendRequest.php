@@ -15,9 +15,8 @@ chdir(dirname(__FILE__));
 
 		$uploadFriendRequest = $Friend->upload($accountID, $targetAccountID, $comment);
 
-		echo $uploadFriendRequest;
+		exit($uploadFriendRequest);
 	}
-	else
-	{
-		echo -1;
-	}
+
+	exit("-1");
+?>
