@@ -15,7 +15,7 @@
 		$userID 		= $main->get_user_id($accountID);
 		$page 			= ExploitPatch::remove($_POST["page"]);
 
-		$loadAccountComments = $AccountComment->get_data($accountID, $userID, $page);
+		$loadAccountComments = $AccountComment->get_data($userID, $page);
 
 		exit($loadAccountComments);
 	}

@@ -18,7 +18,7 @@
 		$userID			= $main->get_user_id($accountID, $userName);
 		$comment		= ExploitPatch::remove($_POST["comment"]);
 
-		$uploadComment = $AccountComment->upload_comment($accountID, $userID, $userName, $comment);
+		$uploadComment = $AccountComment->upload_comment($userID, $userName, $comment);
 
 		exit($uploadComment);
 	}
