@@ -16,7 +16,7 @@
 		$commentID			= ExploitPatch::remove($_POST["commentID"]);
 		$permission 		= $main->getRolePermission($userID, "actionDeleteComment");
 
-		$deleteAccountComment = $AccountComment->delete_Comment($userID, $commentID, $permission);
+		$deleteAccountComment = $AccountComment->delete_comment($userID, $commentID, $permission);
 
 		exit($deleteAccountComment);
 	} 
