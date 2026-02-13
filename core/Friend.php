@@ -3,47 +3,48 @@ require_once __DIR__."/lib/Database.php";
 require_once __DIR__."/lib/Lib.php";
 
 interface FriendInterface {
-    public function accept(int $accountID, int $requestID): string;
-    public function block(int $accountID, int $targetAccountID): string;
-    public function read(int $accountID, int $requestID): string;
-    public function delete(int $accountID, int $targetAccountID, int $isSender): string;
-    public function remove(int $accountID, int $targetAccountID): string;
-    public function unblock(int $accountID, int $targetAccountID): string;
-    public function upload(int $accountID, int $targetAccountID, string $comment): string;
-    public function getData(int $accountID, int $page, int $getSent): string;
-    public function getDataList(int $accountID, int $type): string;
+    public function accept(int $accountId, int $requestId): string;
+    public function block(int $accountId, int $targetAccountId): string;
+    public function read(int $accountId, int $requestId): string;
+    public function delete(int $accountId, int $targetAccountId, int $isSender): string;
+    public function remove(int $accountId, int $targetAccountId): string;
+    public function unblock(int $accountId, int $targetAccountId): string;
+    public function upload(int $accountId, int $targetAccountId, string $comment): string;
+    public function getData(int $accountId, int $page, int $getSent): string;
+    public function getDataList(int $accountId, int $type): string;
 }
 
 class Friend implements FriendInterface {
-    protected $database;
-    protected $lib;
+    protected Database $database;
+    protected Lib $lib;
 
     public function __construct() {
         $this->database = new Database();
         $this->lib = new Lib();
     }
 
-    public function accept(int $accountID, int $requestID): string {
+    public function accept(int $accountId, int $requestId): string {
         try {
-            $request = $this->database->fetch_one(
-                "SELECT accountID, toAccountID FROM friendreqs WHERE ID = :requestID",
-                [":requestID" => $requestID]
+            $request = $this->database->fetchOne(
+                "SELECT accountID, toAccountID FROM friendreqs WHERE ID = ?",
+                [$requestId]
             );
 
-            if (!$request || $request["toAccountID"] != $accountID || $request["accountID"] == $accountID) {
+            if (!$request || $request["toAccountID"] != $accountId || $request["accountID"] == $accountId) {
                 return "-1";
             }
 
-            $this->database->insert(
-                "INSERT INTO friendships (person1, person2, isNew1, isNew2) VALUES (:person1, :person2, 1, 1)",
-                [
-                    ":person1" => $request["accountID"],
-                    ":person2" => $request["toAccountID"]
-                ]
-            );
-            $this->database->execute(
-                "DELETE FROM friendreqs WHERE ID = :requestID LIMIT 1",
-                [":requestID" => $requestID]
+            $this->database->insert('friendships', [
+                'person1' => $request["accountID"],
+                'person2' => $request["toAccountID"],
+                'isNew1' => 1,
+                'isNew2' => 1
+            ]);
+
+            $this->database->delete(
+                'friendreqs',
+                'ID = ?',
+                [$requestId]
             );
 
             return "1";
@@ -54,17 +55,16 @@ class Friend implements FriendInterface {
         }
     }
 
-    public function block(int $accountID, int $targetAccountID): string {
+    public function block(int $accountId, int $targetAccountId): string {
         try {
-            if ($accountID == $targetAccountID) return "-1";
+            if ($accountId == $targetAccountId) {
+                return "-1";
+            }
 
-            $this->database->insert(
-                "INSERT INTO blocks (person1, person2) VALUES (:accountID, :targetAccountID)",
-                [
-                    ":accountID" => $accountID,
-                    ":targetAccountID" => $targetAccountID
-                ]
-            );
+            $this->database->insert('blocks', [
+                'person1' => $accountId,
+                'person2' => $targetAccountId
+            ]);
 
             return "1";
 
@@ -74,14 +74,13 @@ class Friend implements FriendInterface {
         }
     }
 
-    public function read(int $accountID, int $requestID): string {
+    public function read(int $accountId, int $requestId): string {
         try {
-            $this->database->execute(
-                "UPDATE friendreqs SET isNew = '0' WHERE ID = :requestID AND toAccountID = :accountID",
-                [
-                    ":requestID" => $requestID,
-                    ":accountID" => $accountID
-                ]
+            $this->database->update(
+                'friendreqs',
+                ['isNew' => 0],
+                'ID = ? AND toAccountID = ?',
+                [$requestId, $accountId]
             );
 
             return "1";
@@ -92,23 +91,19 @@ class Friend implements FriendInterface {
         }
     }
 
-    public function delete(int $accountID, int $targetAccountID, int $isSender): string {
+    public function delete(int $accountId, int $targetAccountId, int $isSender): string {
         try {
-            if (isset($isSender) && $isSender == 1) {
-                $this->database->execute(
-                    "DELETE FROM friendreqs WHERE accountID = :accountID AND toAccountID = :targetAccountID LIMIT 1",
-                    [
-                        ":accountID" => $accountID,
-                        ":targetAccountID" => $targetAccountID
-                    ]
+            if ($isSender == 1) {
+                $this->database->delete(
+                    'friendreqs',
+                    'accountID = ? AND toAccountID = ?',
+                    [$accountId, $targetAccountId]
                 );
             } else {
-                $this->database->execute(
-                    "DELETE FROM friendreqs WHERE toAccountID = :accountID AND accountID = :targetAccountID LIMIT 1",
-                    [
-                        ":accountID" => $accountID,
-                        ":targetAccountID" => $targetAccountID
-                    ]
+                $this->database->delete(
+                    'friendreqs',
+                    'toAccountID = ? AND accountID = ?',
+                    [$accountId, $targetAccountId]
                 );
             }
 
@@ -120,14 +115,13 @@ class Friend implements FriendInterface {
         }
     }
 
-    public function remove(int $accountID, int $targetAccountID): string {
+    public function remove(int $accountId, int $targetAccountId): string {
         try {
             $this->database->execute(
-                "DELETE FROM friendships WHERE (person1 = :accountID AND person2 = :targetAccountID) OR (person2 = :accountID AND person1 = :targetAccountID)",
-                [
-                    ":accountID" => $accountID,
-                    ":targetAccountID" => $targetAccountID
-                ]
+                "DELETE FROM friendships 
+                 WHERE (person1 = ? AND person2 = ?) 
+                    OR (person2 = ? AND person1 = ?)",
+                [$accountId, $targetAccountId, $accountId, $targetAccountId]
             );
 
             return "1";
@@ -138,14 +132,12 @@ class Friend implements FriendInterface {
         }
     }
 
-    public function unblock(int $accountID, int $targetAccountID): string {
+    public function unblock(int $accountId, int $targetAccountId): string {
         try {
-            $this->database->execute(
-                "DELETE FROM blocks WHERE person1 = :accountID AND person2 = :targetAccountID",
-                [
-                    ":accountID" => $accountID,
-                    ":targetAccountID" => $targetAccountID
-                ]
+            $this->database->delete(
+                'blocks',
+                'person1 = ? AND person2 = ?',
+                [$accountId, $targetAccountId]
             );
 
             return "1";
@@ -156,44 +148,40 @@ class Friend implements FriendInterface {
         }
     }
 
-    public function upload(int $accountID, int $targetAccountID, string $comment): string {
+    public function upload(int $accountId, int $targetAccountId, string $comment): string {
         try {
-            if ($accountID == $targetAccountID) return "-1";
+            if ($accountId == $targetAccountId) {
+                return "-1";
+            }
 
             $isBlocked = $this->database->exists(
                 "blocks",
-                "person1 = :targetAccountID AND person2 = :accountID",
-                [
-                    ":targetAccountID" => $targetAccountID,
-                    ":accountID" => $accountID
-                ]
+                "person1 = ? AND person2 = ?",
+                [$targetAccountId, $accountId]
             );
 
-            $friendsOnly = $this->database->fetch_column(
-                "SELECT frS FROM accounts WHERE accountID = :targetAccountID AND frS = 1",
-                [":targetAccountID" => $targetAccountID]
+            $friendsOnly = $this->database->fetchColumn(
+                "SELECT frS FROM accounts WHERE accountID = ? AND frS = 1",
+                [$targetAccountId]
             );
-            $existingRequest = $this->database->fetch_column(
-                "SELECT COUNT(*) FROM friendreqs WHERE (accountID = :accountID AND toAccountID = :targetAccountID) OR (toAccountID = :accountID AND accountID = :targetAccountID)",
-                [
-                    ":accountID" => $accountID,
-                    ":targetAccountID" => $targetAccountID
-                ]
+
+            $existingRequest = $this->database->fetchColumn(
+                "SELECT COUNT(*) FROM friendreqs 
+                 WHERE (accountID = ? AND toAccountID = ?) 
+                    OR (toAccountID = ? AND accountID = ?)",
+                [$accountId, $targetAccountId, $accountId, $targetAccountId]
             );
 
             if ($existingRequest > 0 || $isBlocked || $friendsOnly) {
                 return "-1";
             }
 
-            $this->database->insert(
-                "INSERT INTO friendreqs (accountID, toAccountID, comment, uploadDate) VALUES (:accountID, :targetAccountID, :comment, :uploadDate)",
-                [
-                    ":accountID" => $accountID,
-                    ":targetAccountID" => $targetAccountID,
-                    ":comment" => $comment,
-                    ":uploadDate" => time()
-                ]
-            );
+            $this->database->insert('friendreqs', [
+                'accountID' => $accountId,
+                'toAccountID' => $targetAccountId,
+                'comment' => $comment,
+                'uploadDate' => time()
+            ]);
 
             return "1";
 
@@ -203,66 +191,78 @@ class Friend implements FriendInterface {
         }
     }
 
-    public function getData(int $accountID, int $page, int $getSent): string {
+    public function getData(int $accountId, int $page, int $getSent): string {
         try {
             $offset = $page * 10;
-            $requestString = "";
 
             if ($getSent == 0) {
-                $requests = $this->database->fetch_all(
+                $requests = $this->database->fetchAll(
                     "SELECT accountID, toAccountID, uploadDate, ID, comment, isNew 
                      FROM friendreqs 
-                     WHERE toAccountID = :accountID 
-                     LIMIT 10 OFFSET :offset",
-                    [
-                        ":accountID" => $accountID,
-                        ":offset" => $offset
-                    ]
+                     WHERE toAccountID = ? 
+                     LIMIT 10 OFFSET ?",
+                    [$accountId, $offset]
                 );
                 
                 $totalCount = $this->database->count(
                     "friendreqs", 
-                    "toAccountID = :accountID", 
-                    [":accountID" => $accountID]
+                    "toAccountID = ?", 
+                    [$accountId]
                 );
             } else {
-                $requests = $this->database->fetch_all(
+                $requests = $this->database->fetchAll(
                     "SELECT accountID, toAccountID, uploadDate, ID, comment, isNew 
                      FROM friendreqs 
-                     WHERE accountID = :accountID 
-                     LIMIT 10 OFFSET :offset",
-                    [
-                        ":accountID" => $accountID,
-                        ":offset" => $offset
-                    ]
+                     WHERE accountID = ? 
+                     LIMIT 10 OFFSET ?",
+                    [$accountId, $offset]
                 );
                 
                 $totalCount = $this->database->count(
                     "friendreqs", 
-                    "accountID = :accountID", 
-                    [":accountID" => $accountID]
+                    "accountID = ?", 
+                    [$accountId]
                 );
             }
 
             if (empty($requests)) {
                 return "-2";
             }
+
+            $requestString = "";
+
             foreach ($requests as $request) {
-                $requesterID = ($getSent == 0) ? $request["accountID"] : $request["toAccountID"];
+                $requesterId = ($getSent == 0) ? $request["accountID"] : $request["toAccountID"];
                 
-                $user = $this->database->fetch_one(
+                $user = $this->database->fetchOne(
                     "SELECT userName, userID, icon, color1, color2, iconType, special, extID 
                      FROM users 
-                     WHERE extID = :requesterID",
-                    [":requesterID" => $requesterID]
+                     WHERE extID = ?",
+                    [$requesterId]
                 );
 
-                if (!$user) continue;
+                if (!$user) {
+                    continue;
+                }
 
-                $uploadDate = $this->lib->make_time($request["uploadDate"]);
-                $extID = is_numeric($user["extID"]) ? $user["extID"] : 0;
+                $uploadDate = $this->lib->makeTime($request["uploadDate"]);
+                $extId = is_numeric($user["extID"]) ? $user["extID"] : 0;
 
-                $requestString .= "1:".$user["userName"].":2:".$user["userID"].":9:".$user["icon"].":10:".$user["color1"].":11:".$user["color2"].":14:".$user["iconType"].":15:".$user["special"].":16:".$extID.":32:".$request["ID"].":35:".$request["comment"].":41:".$request["isNew"].":37:".$uploadDate."|";
+                $requestString .= sprintf(
+                    "1:%s:2:%d:9:%d:10:%d:11:%d:14:%d:15:%d:16:%d:32:%d:35:%s:41:%d:37:%s|",
+                    $user["userName"],
+                    $user["userID"],
+                    $user["icon"],
+                    $user["color1"],
+                    $user["color2"],
+                    $user["iconType"],
+                    $user["special"],
+                    $extId,
+                    $request["ID"],
+                    $request["comment"],
+                    $request["isNew"],
+                    $uploadDate
+                );
             }
 
             $requestString = rtrim($requestString, "|");
@@ -275,80 +275,96 @@ class Friend implements FriendInterface {
         }
     }
 
-    public function getDataList(int $accountID, int $type): string {
+    public function getDataList(int $accountId, int $type): string {
         try {
-            $userString = "";
             $userStatusMap = [];
 
             if ($type == 0) {
-                $relationships = $this->database->fetch_all(
+                $relationships = $this->database->fetchAll(
                     "SELECT person1, isNew1, person2, isNew2 
                      FROM friendships 
-                     WHERE person1 = :accountID OR person2 = :accountID",
-                    [":accountID" => $accountID]
+                     WHERE person1 = ? OR person2 = ?",
+                    [$accountId, $accountId]
                 );
 
                 if (empty($relationships)) {
                     return "-2";
                 }
 
-                $userIDs = [];
+                $userIds = [];
                 foreach ($relationships as $rel) {
-                    if ($rel["person1"] == $accountID) {
-                        $userIDs[] = $rel["person2"];
+                    if ($rel["person1"] == $accountId) {
+                        $userIds[] = $rel["person2"];
                         $userStatusMap[$rel["person2"]] = $rel["isNew2"];
                     } else {
-                        $userIDs[] = $rel["person1"];
+                        $userIds[] = $rel["person1"];
                         $userStatusMap[$rel["person1"]] = $rel["isNew1"];
                     }
                 }
 
             } else {
-                $blocks = $this->database->fetch_all(
-                    "SELECT person2 FROM blocks WHERE person1 = :accountID",
-                    [":accountID" => $accountID]
+                $blocks = $this->database->fetchAll(
+                    "SELECT person2 FROM blocks WHERE person1 = ?",
+                    [$accountId]
                 );
 
                 if (empty($blocks)) {
                     return "-2";
                 }
 
-                $userIDs = array_column($blocks, 'person2');
+                $userIds = array_column($blocks, 'person2');
 
-                foreach ($userIDs as $userID) {
-                    $userStatusMap[$userID] = 0;
+                foreach ($userIds as $userId) {
+                    $userStatusMap[$userId] = 0;
                 }
             }
 
-            if (empty($userIDs)) {
+            if (empty($userIds)) {
                 return "-2";
             }
 
-            $placeholders = implode(',', array_fill(0, count($userIDs), '?'));
-            $users = $this->database->fetch_all(
+            $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+            $users = $this->database->fetchAll(
                 "SELECT userName, userID, icon, color1, color2, iconType, special, extID 
                  FROM users 
                  WHERE extID IN ($placeholders) 
                  ORDER BY userName ASC",
-                $userIDs
+                $userIds
             );
+
+            $userString = "";
 
             foreach ($users as $user) {
                 $status = $userStatusMap[$user["extID"]] ?? 0;
-                $userString .= "1:".$user["userName"].":2:".$user["userID"].":9:".$user["icon"].":10:".$user["color1"].":11:".$user["color2"].":14:".$user["iconType"].":15:".$user["special"].":16:".$user["extID"].":18:0:41:".$status."|";
+                $userString .= sprintf(
+                    "1:%s:2:%d:9:%d:10:%d:11:%d:14:%d:15:%d:16:%d:18:0:41:%d|",
+                    $user["userName"],
+                    $user["userID"],
+                    $user["icon"],
+                    $user["color1"],
+                    $user["color2"],
+                    $user["iconType"],
+                    $user["special"],
+                    $user["extID"],
+                    $status
+                );
             }
 
             $userString = rtrim($userString, "|");
 
             if ($type == 0) {
-                $this->database->execute(
-                    "UPDATE friendships SET isNew1 = '0' WHERE person2 = :accountID",
-                    [":accountID" => $accountID]
+                $this->database->update(
+                    'friendships',
+                    ['isNew1' => 0],
+                    'person2 = ?',
+                    [$accountId]
                 );
                 
-                $this->database->execute(
-                    "UPDATE friendships SET isNew2 = '0' WHERE person1 = :accountID",
-                    [":accountID" => $accountID]
+                $this->database->update(
+                    'friendships',
+                    ['isNew2' => 0],
+                    'person1 = ?',
+                    [$accountId]
                 );
             }
 

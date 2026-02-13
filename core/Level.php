@@ -7,76 +7,77 @@ require_once __DIR__."/lib/exploitPatch.php";
 require_once __DIR__."/lib/generateHash.php";
 
 interface LevelInterface {
-    public function existLevel(string $levelName, int $userID): int;
-    public function delete(int $userID, int $levelID): string;
-    public function download(int $accountID, int $levelID, $inc, $extras, $hostname): string;
+    public function existLevel(string $levelName, int $userId): int;
+    public function delete(int $userId, int $levelId): string;
+    public function download(int $accountId, int $levelId, bool $inc, bool $extras, string $hostname): string;
     public function getDaily(int $type): string;
-    public function rateStar(int $accountID, int $levelID, int $starStars): string;
-    public function rateDemon(int $accountID, int $levelID, int $rating): string;
-    public function rateSuggest(int $accountID, int $levelID, int $starStars, int $feature, array $difficulty): string;
-    public function report(int $levelID, $hostname): string;
-    public function updateDesc($accountID, int $levelID, string $levelDescription): string;
+    public function rateStar(int $accountId, int $levelId, int $starStars): string;
+    public function rateDemon(int $accountId, int $levelId, int $rating): string;
+    public function rateSuggest(int $accountId, int $levelId, int $starStars, int $feature, array $difficulty): string;
+    public function report(int $levelId, string $hostname): string;
+    public function updateDesc(int $accountId, int $levelId, string $levelDescription): string;
     public function upload(
-        int $accountID, 
-        int $levelID, 
-        $userName,
-        $hostname,
-        $userID,
-        $levelName,
-        $audioTrack,
-        $levelLength,
-        $secret,
-        $levelString,
-        $gjp,
-        $levelVersion,
-        $ts,
-        $songs,
-        $sfxs,
-        $auto,
-        $original,
-        $twoPlayer,
-        $songID,
-        $object,
-        $coins,
-        $requestedStars,
-        $extraString,
-        $levelInfo,
-        $unlisted,
-        $unlisted2,
-        $ldm,
-        $wt,
-        $wt2,
-        $settingsString,
-        $levelDescription,
-        $password
+        int $accountId, 
+        int $levelId, 
+        string $userName,
+        string $hostname,
+        int $userId,
+        string $levelName,
+        int $audioTrack,
+        int $levelLength,
+        string $secret,
+        string $levelString,
+        string $gjp,
+        int $levelVersion,
+        int $ts,
+        string $songs,
+        string $sfxs,
+        int $auto,
+        int $original,
+        int $twoPlayer,
+        int $songId,
+        int $object,
+        int $coins,
+        int $requestedStars,
+        string $extraString,
+        string $levelInfo,
+        int $unlisted,
+        int $unlisted2,
+        int $ldm,
+        int $wt,
+        int $wt2,
+        string $settingsString,
+        string $levelDescription,
+        int $password
     ): int;
 }
 
 class Level implements LevelInterface {
-    protected $database;
-    protected $main, $lib;
+    private Database $db;
+    private Main $main;
+    private Lib $lib;
 
-    private $uploadDate, $updateDate;
-    public $gameVersion, $binaryVersion;
+    private int $uploadDate;
+    private int $updateDate;
+    
+    public int $gameVersion = 0;
+    public int $binaryVersion = 0;
     
     public function __construct() {
         $this->lib = new Lib();
         $this->main = new Main();
-        $this->database = new Database();
+        $this->db = new Database();
 
         $this->uploadDate = time();
         $this->updateDate = time();
     }
 
-    public function existLevel(string $levelName, int $userID): int {
+    public function existLevel(string $levelName, int $userId): int {
         try {
-            $count = $this->database->count(
+            $count = $this->db->count(
                 "levels",
-                "levelName = :levelName AND userID = :userID",
-                [
-                    ":levelName" => $levelName,
-                    ":userID" => $userID
-                ]
+                "levelName = ? AND userID = ?",
+                [$levelName, $userId]
             );
             
             return $count > 0 ? 1 : 0;
@@ -87,35 +88,27 @@ class Level implements LevelInterface {
         }
     }
 
-    public function delete(int $userID, int $levelID): string {
+    public function delete(int $userId, int $levelId): string { 
         try {
-            // Удаляем уровень из базы данных
-            $deleted = $this->database->execute(
-                "DELETE FROM levels WHERE levelID = :levelID AND userID = :userID AND starStars = 0 LIMIT 1",
-                [
-                    ":levelID" => $levelID,
-                    ":userID" => $userID
-                ]
+            $deleted = $this->db->delete(
+                'levels',
+                'levelID = ? AND userID = ? AND starStars = 0',
+                [$levelId, $userId]
             );
 
-            if (!$deleted) {
+            if ($deleted === 0) {
                 return "-1";
             }
 
-            // Логируем действие
-            $this->database->insert(
-                "INSERT INTO actions (type, value, timestamp, value2) VALUES (:type, :itemID, :time, :ip)",
-                [
-                    ":type" => 8,
-                    ":itemID" => $levelID,
-                    ":time" => time(),
-                    ":ip" => $userID
-                ]
-            );
+            $this->db->insert('actions', [
+                'type' => 8,
+                'value' => $levelId,
+                'timestamp' => time(),
+                'value2' => $userId
+            ]);
 
-            // Перемещаем файл уровня
-            $levelFile = __DIR__."/../database/data/levels/$levelID";
-            $deletedDir = __DIR__."/../database/data/levels/deleted/$levelID";
+            $levelFile = __DIR__."/../database/data/levels/$levelId";
+            $deletedDir = __DIR__."/../database/data/levels/deleted/$levelId";
             
             if (file_exists($levelFile)) {
                 if (!is_dir(dirname($deletedDir))) {
@@ -133,28 +126,27 @@ class Level implements LevelInterface {
         }
     }
 
-    public function download(int $accountID, int $levelID, $inc, $extras, $hostname): string {
+    public function download(int $accountId, int $levelId, bool $inc, bool $extras, string $hostname): string {
         try {
-            if (!is_numeric($levelID)) return "-1";
+            if (!is_numeric($levelId)) {
+                return "-1";
+            }
 
-            $dailyData = $this->handleDailyLevel($levelID);
-            $actualLevelID = $dailyData['levelID'] ?? $levelID;
-            $feaID = $dailyData['feaID'] ?? 0;
+            $dailyData = $this->handleDailyLevel($levelId);
+            $actualLevelId = $dailyData['levelId'] ?? $levelId;
+            $feaId = $dailyData['feaId'] ?? 0;
             $daily = $dailyData['isDaily'] ?? 0;
 
-            // Получаем данные уровня
-            $levelData = $this->getLevelData($actualLevelID, $daily);
+            $levelData = $this->getLevelData($actualLevelId, $daily);
             if (!$levelData) {
                 return "";
             }
 
-            // Обновляем счетчик загрузок
             if ($inc) {
-                $this->incrementDownloadCount($actualLevelID, $hostname);
+                $this->incrementDownloadCount($actualLevelId, $hostname);
             }
 
-            // Формируем ответ
-            return $this->buildDownloadResponse($levelData, $actualLevelID, $daily, $feaID, $extras);
+            return $this->buildDownloadResponse($levelData, $actualLevelId, $daily, $feaId, $extras);
 
         } catch (Exception $e) {
             error_log("Level download error: " . $e->getMessage());
@@ -162,113 +154,109 @@ class Level implements LevelInterface {
         }
     }
 
-    private function handleDailyLevel(int $levelID): array {
+    private function handleDailyLevel(int $levelId): array {
         $dailyTypes = [
             -1 => ['type' => 0, 'offset' => 0],
             -2 => ['type' => 1, 'offset' => 100001],
             -3 => ['type' => 2, 'offset' => 200001]
         ];
 
-        if (!isset($dailyTypes[$levelID])) {
-            return ['isDaily' => 0, 'levelID' => $levelID];
+        if (!isset($dailyTypes[$levelId])) {
+            return ['isDaily' => 0, 'levelId' => $levelId];
         }
 
-        $config = $dailyTypes[$levelID];
-        $daily = $this->database->fetch_one(
-            "SELECT feaID, levelID FROM dailyfeatures WHERE timestamp < :time AND type = :type ORDER BY timestamp DESC LIMIT 1",
-            [
-                ":time" => time(),
-                ":type" => $config['type']
-            ]
+        $config = $dailyTypes[$levelId];
+        $daily = $this->db->fetchOne(
+            "SELECT feaID, levelID FROM dailyfeatures 
+             WHERE timestamp < ? AND type = ? 
+             ORDER BY timestamp DESC LIMIT 1",
+            [time(), $config['type']]
         );
 
         if ($daily) {
             return [
                 'isDaily' => 1,
-                'levelID' => $daily['levelID'],
-                'feaID' => $daily['feaID'] + $config['offset']
+                'levelId' => $daily['levelID'],
+                'feaId' => $daily['feaID'] + $config['offset']
             ];
         }
 
-        return ['isDaily' => 0, 'levelID' => $levelID];
+        return ['isDaily' => 0, 'levelId' => $levelId];
     }
 
-    private function getLevelData(int $levelID, bool $isDaily = false): ?array {
+    private function getLevelData(int $levelId, bool $isDaily): ?array {
         if ($isDaily) {
-            return $this->database->fetch_one(
+            return $this->db->fetchOne(
                 "SELECT levels.*, users.userName, users.extID 
                  FROM levels 
                  LEFT JOIN users ON levels.userID = users.userID 
-                 WHERE levelID = :levelID",
-                [":levelID" => $levelID]
+                 WHERE levelID = ?",
+                [$levelId]
             );
         }
 
-        return $this->database->fetch_one(
-            "SELECT * FROM levels WHERE levelID = :levelID",
-            [":levelID" => $levelID]
+        return $this->db->fetchOne(
+            "SELECT * FROM levels WHERE levelID = ?",
+            [$levelId]
         );
     }
 
-    private function incrementDownloadCount(int $levelID, string $hostname): void {
-        $downloadCount = $this->database->fetch_column(
-            "SELECT COUNT(*) FROM actions_downloads WHERE levelID = :levelID AND ip = INET6_ATON(:ip)",
-            [
-                ":levelID" => $levelID,
-                ":ip" => $hostname
-            ]
+    private function incrementDownloadCount(int $levelId, string $hostname): void {
+        $downloadCount = $this->db->fetchColumn(
+            "SELECT COUNT(*) FROM actions_downloads WHERE levelID = ? AND ip = INET6_ATON(?)",
+            [$levelId, $hostname]
         );
 
         if ($downloadCount < 2) {
-            $this->database->execute(
-                "UPDATE levels SET downloads = downloads + 1 WHERE levelID = :levelID",
-                [":levelID" => $levelID]
+            $this->db->execute(
+                "UPDATE levels SET downloads = downloads + 1 WHERE levelID = ?",
+                [$levelId]
             );
 
-            $this->database->insert(
-                "INSERT INTO actions_downloads (levelID, ip) VALUES (:levelID, INET6_ATON(:ip))",
-                [
-                    ":levelID" => $levelID,
-                    ":ip" => $hostname
-                ]
-            );
+            $this->db->insert('actions_downloads', [
+                'levelID' => $levelId,
+                'ip' => $hostname
+            ]);
         }
     }
 
-    private function buildDownloadResponse(array $levelData, int $levelID, int $daily, int $feaID, bool $extras): string {
-        $uploadDate = $this->lib->make_time($levelData["uploadDate"]);
-        $updateDate = $this->lib->make_time($levelData["updateDate"]);
+    private function buildDownloadResponse(array $levelData, int $levelId, int $daily, int $feaId, bool $extras): string {
+        $uploadDate = $this->lib->makeTime($levelData["uploadDate"]);
+        $updateDate = $this->lib->makeTime($levelData["updateDate"]);
 
-        // Обработка уровня
-        $levelString = $this->getLevelString($levelID);
+        $levelString = $this->getLevelString($levelId);
         $processedLevelString = $this->processLevelString($levelString);
 
-        // Обработка описания и пароля
         $levelDescription = $levelData["levelDesc"];
-        $xor = $this->processLevelDescription($levelDescription, $levelData["password"]);
+        $password = 1;
+        $xor = $this->processPassword($password, $levelDescription);
 
-        // Формируем основной ответ
         $response = $this->buildBaseResponse($levelData, $levelDescription, $processedLevelString, $uploadDate, $updateDate, $xor);
         
-        // Добавляем дополнительные поля
-        if ($daily == 1) $response .= ":41:" . $feaID;
-        if ($extras) $response .= ":26:" . $levelData["levelInfo"];
+        if ($daily == 1) {
+            $response .= ":41:" . $feaId;
+        }
+        if ($extras) {
+            $response .= ":26:" . $levelData["levelInfo"];
+        }
 
-        // Добавляем хэши
         $response .= "#" . GenerateHash::genSolo($levelString) . "#";
         
-        $hashString = $this->buildHashString($levelData, $levelData["password"], $feaID);
+        $hashString = $this->buildHashString($levelData, $password, $feaId);
         $response .= GenerateHash::genSolo2($hashString);
         
-        // Добавляем дополнительную информацию
-        if ($daily == 1) $response .= "#" . $this->main->get_user_string($levelData);
-        if ($this->binaryVersion == 30) $response .= "#" . $hashString;
+        if ($daily == 1) {
+            $response .= "#" . $this->main->getUserString($levelData["userID"]);
+        }
+        if ($this->binaryVersion == 30) {
+            $response .= "#" . $hashString;
+        }
 
         return $response;
     }
 
-    private function getLevelString(int $levelID): string {
-        $levelFile = __DIR__ . "/../database/data/levels/$levelID";
+    private function getLevelString(int $levelId): string {
+        $levelFile = __DIR__ . "/../database/data/levels/$levelId";
         return file_exists($levelFile) ? file_get_contents($levelFile) : "";
     }
 
@@ -280,60 +268,65 @@ class Level implements LevelInterface {
         return $levelString;
     }
 
-    private function processLevelDescription(string $levelDescription, int $password): string {
+    private function processPassword(int $password, string &$levelDescription): string {
         if ($this->gameVersion > 19) {
-            return $password != 0 ? base64_encode(XORCipher::cipher($password, 26364)) : $password;
-        } else {
-            return base64_decode($levelDescription);
+            return $password != 0 ? base64_encode(XORCipher::cipher($password, 26364)) : (string)$password;
         }
+        $levelDescription = base64_decode($levelDescription);
+        return (string)$password;
     }
 
-    private function buildBaseResponse(array $levelData, string $description, string $levelString, string $uploadDate, string $updateDate, $xor): string {
-        $base = [
-            "1:" . $levelData["levelID"],
-            "2:" . $levelData["levelName"],
-            "3:" . $description,
-            "4:" . $levelString,
-            "5:" . $levelData["levelVersion"],
-            "6:" . $levelData["userID"],
-            "8:10",
-            "9:" . $levelData["starDifficulty"],
-            "10:" . $levelData["downloads"],
-            "11:1",
-            "12:" . $levelData["audioTrack"],
-            "13:" . $levelData["gameVersion"],
-            "14:" . $levelData["likes"],
-            "17:" . $levelData["starDemon"],
-            "43:" . $levelData["starDemonDiff"],
-            "25:" . $levelData["starAuto"],
-            "18:" . $levelData["starStars"],
-            "19:" . $levelData["starFeatured"],
-            "42:" . $levelData["starEpic"],
-            "45:" . $levelData["objects"],
-            "15:" . $levelData["levelLength"],
-            "30:" . $levelData["original"],
-            "31:" . $levelData["twoPlayer"],
-            "28:" . $uploadDate,
-            "29:" . $updateDate,
-            "35:" . $levelData["songID"],
-            "36:" . $levelData["extraString"],
-            "37:" . $levelData["coins"],
-            "38:" . $levelData["starCoins"],
-            "39:" . $levelData["requestedStars"],
-            "46:" . $levelData["wt"],
-            "47:" . $levelData["wt2"],
-            "48:" . $levelData["settingsString"],
-            "40:" . $levelData["isLDM"],
-            "27:" . $xor,
-            "52:" . $levelData["songIDs"],
-            "53:" . $levelData["sfxIDs"],
-            "57:" . $levelData["ts"]
+    private function buildBaseResponse(array $levelData, string $description, string $levelString, string $uploadDate, string $updateDate, string $xor): string {
+        $fields = [
+            1 => $levelData["levelID"],
+            2 => $levelData["levelName"],
+            3 => $description,
+            4 => $levelString,
+            5 => $levelData["levelVersion"],
+            6 => $levelData["userID"],
+            8 => 10,
+            9 => $levelData["starDifficulty"],
+            10 => $levelData["downloads"],
+            11 => 1,
+            12 => $levelData["audioTrack"],
+            13 => $levelData["gameVersion"],
+            14 => $levelData["likes"],
+            17 => $levelData["starDemon"],
+            43 => $levelData["starDemonDiff"],
+            25 => $levelData["starAuto"],
+            18 => $levelData["starStars"],
+            19 => $levelData["starFeatured"],
+            42 => $levelData["starEpic"],
+            45 => $levelData["objects"],
+            15 => $levelData["levelLength"],
+            30 => $levelData["original"],
+            31 => $levelData["twoPlayer"],
+            28 => $uploadDate,
+            29 => $updateDate,
+            35 => $levelData["songID"],
+            36 => $levelData["extraString"],
+            37 => $levelData["coins"],
+            38 => $levelData["starCoins"],
+            39 => $levelData["requestedStars"],
+            46 => $levelData["wt"],
+            47 => $levelData["wt2"],
+            48 => $levelData["settingsString"],
+            40 => $levelData["isLDM"],
+            27 => $xor,
+            52 => $levelData["songIDs"],
+            53 => $levelData["sfxIDs"],
+            57 => $levelData["ts"]
         ];
 
-        return implode(":", $base);
+        $parts = [];
+        foreach ($fields as $key => $value) {
+            $parts[] = "$key:$value";
+        }
+
+        return implode(":", $parts);
     }
 
-    private function buildHashString(array $levelData, int $password, int $feaID): string {
+    private function buildHashString(array $levelData, int $password, int $feaId): string {
         return implode(",", [
             $levelData["userID"],
             $levelData["starStars"],
@@ -342,29 +335,30 @@ class Level implements LevelInterface {
             $levelData["starCoins"],
             $levelData["starFeatured"],
             $password,
-            $feaID
+            $feaId
         ]);
     }
 
     public function getDaily(int $type): string {
         try {
-            $daily = $this->database->fetch_column(
-                "SELECT feaID FROM dailyfeatures WHERE timestamp < :current AND type = :type ORDER BY timestamp DESC LIMIT 1",
-                [
-                    ":current" => time(),
-                    ":type" => $type
-                ]
+            $dailyLevelId = $this->db->fetchColumn(
+                "SELECT feaID FROM dailyfeatures 
+                 WHERE timestamp < ? AND type = ? 
+                 ORDER BY timestamp DESC LIMIT 1",
+                [time(), $type]
             );
 
-            if (!$daily) return "-1";
-
+            if (!$dailyLevelId) {
+                return "-1";
+            }
+            
             $midnight = ($type == 1) ? strtotime('next monday') : strtotime('tomorrow 00:00:00');
+
+            if ($type == 1) $dailyLevelId += 100001;
+            if ($type == 2) $dailyLevelId += 200001;
             
-            if ($type == 1) $daily += 100001;
-            if ($type == 2) $daily += 200001;
-            
-            $timeleft = $midnight - time();
-            return $daily . "|" . $timeleft;
+            $timeLeft = $midnight - time();
+            return $dailyLevelId . "|" . $timeLeft;
 
         } catch (Exception $e) {
             error_log("Level getDaily error: " . $e->getMessage());
@@ -372,57 +366,51 @@ class Level implements LevelInterface {
         }
     }
 
-    public function rateStar(int $accountID, int $levelID, int $starStars): string {
+    public function rateStar(int $accountId, int $levelId, int $starStars): string {
         try {
-            if (!is_numeric($accountID)) return "-1";
-
-            $difficulty = $this->main->get_difficulty($starStars, "", "stars");
+            if (!is_numeric($accountId)) {
+                return "-1";
+            }
             
-            // Записываем оценку
-            $this->database->insert(
-                "INSERT INTO action_rate (accountID, levelID, difficulty) VALUES (:accountID, :levelID, :difficulty)",
-                [
-                    ":accountID" => $accountID,
-                    ":levelID" => $levelID,
-                    ":difficulty" => $difficulty["difficulty"]
-                ]
-            );
-
-            // Проверяем существующие оценки
-            $rateStats = $this->database->fetch_one(
+            $difficulty = $this->main->getDifficulty($starStars, "", "stars");
+                    
+            $this->db->insert('action_rate', [
+                'accountID' => $accountId,
+                'levelID' => $levelId,
+                'difficulty' => $difficulty["difficulty"]
+            ]);
+                    
+            $rateStats = $this->db->fetchOne(
                 "SELECT difficulty, COUNT(*) as CNT 
                  FROM action_rate 
-                 WHERE levelID = :levelID 
+                 WHERE levelID = ? AND isRated = 0
                  GROUP BY difficulty 
                  HAVING COUNT(*) > 0 
                  ORDER BY CNT DESC 
                  LIMIT 1",
-                [":levelID" => $levelID]
+                [$levelId]
             );
-
+            
             if (!$rateStats || $rateStats["CNT"] <= 5) {
                 return "-1";
             }
-
-            // Получаем среднюю сложность
-            $avgDifficulty = $this->database->fetch_column(
-                "SELECT AVG(difficulty) FROM action_rate WHERE levelID = :levelID",
-                [":levelID" => $levelID]
+            
+            $avgDifficulty = $this->db->fetchColumn(
+                "SELECT AVG(difficulty) FROM action_rate WHERE levelID = ?",
+                [$levelId]
             );
 
-            $diff = round($avgDifficulty);
+            $diff = (int)round($avgDifficulty);
             $auto = ($difficulty["auto"] == 1 && $diff == 10) ? 1 : 0;
             $demon = ($difficulty["demon"] == 1 && $diff == 50) ? 1 : 0;
-
-            // Рейтим уровень
-            $this->main->rate_level($accountID, $levelID, 0, $diff, $auto, $demon);
             
-            // Помечаем оценки как обработанные
-            $this->database->execute(
-                "UPDATE action_rate SET isRated = 1 WHERE levelID = :levelID",
-                [":levelID" => $levelID]
+            $this->main->rateLevel($accountId, $levelId, 0, $diff, $auto, $demon);
+            
+            $this->db->execute(
+                "UPDATE action_rate SET isRated = 1 WHERE levelID = ?",
+                [$levelId]
             );
-
+                
             return "1";
 
         } catch (Exception $e) {
@@ -431,33 +419,30 @@ class Level implements LevelInterface {
         }
     }
 
-    public function rateDemon(int $accountID, int $levelID, int $rating): string {
+    public function rateDemon(int $accountId, int $levelId, int $rating): string {
         try {
-            if (!$this->main->getRolePermission($accountID, "actionRateDemon")) {
+            if (!$this->main->getRolePermission($accountId, "actionRateDemon")) {
                 return "-1";
             }
 
-            $data = $this->lib->demon_filter($rating);
+            $data = $this->lib->demonFilter($rating);
 
-            $this->database->execute(
-                "UPDATE levels SET starDemonDiff = :demon WHERE levelID = :levelID",
-                [
-                    ":demon" => $data["demon"],
-                    ":levelID" => $levelID
-                ]
+            $this->db->update(
+                'levels',
+                ['starDemonDiff' => $data["demon"]],
+                'levelID = ?',
+                [$levelId]
             );
 
-            $this->database->insert(
-                "INSERT INTO modactions (type, value, value3, timestamp, account) VALUES ('10', :value, :levelID, :timestamp, :id)",
-                [
-                    ":value" => $data["name"],
-                    ":levelID" => $levelID,
-                    ":timestamp" => $this->uploadDate,
-                    ":id" => $accountID
-                ]
-            );
-
-            return (string)$levelID;
+            $this->db->insert('modactions', [
+                'type' => 10,
+                'value' => $data["name"],
+                'value3' => $levelId,
+                'timestamp' => $this->uploadDate,
+                'account' => $accountId
+            ]);
+                
+            return (string)$levelId;
 
         } catch (Exception $e) {
             error_log("Level rateDemon error: " . $e->getMessage());
@@ -465,17 +450,17 @@ class Level implements LevelInterface {
         }
     }
 
-    public function rateSuggest(int $accountID, int $levelID, int $starStars, int $feature, array $difficulty): string {
+    public function rateSuggest(int $accountId, int $levelId, int $starStars, int $feature, array $difficulty): string {
         try {
-            if ($this->main->getRolePermission($accountID, "actionRateStars")) {
-                $this->main->rate_level($accountID, $levelID, $starStars, $difficulty["difficulty"], $difficulty["auto"], $difficulty["demon"]);
-                $this->main->feature_level($accountID, $levelID, $feature);
-                $this->main->verify_coins($accountID, $levelID, 1);
+            if ($this->main->getRolePermission($accountId, "actionRateStars")) {
+                $this->main->rateLevel($accountId, $levelId, $starStars, $difficulty["difficulty"], $difficulty["auto"], $difficulty["demon"]);
+                $this->main->featureLevel($accountId, $levelId, $feature);
+                $this->main->verifyCoins($accountId, $levelId, 1);
                 return "1";
             }
 
-            if ($this->main->getRolePermission($accountID, "actionSuggestRating")) {
-                $this->main->suggest_level($accountID, $levelID, $difficulty["difficulty"], $starStars, $feature, $difficulty["auto"], $difficulty["demon"]);
+            if ($this->main->getRolePermission($accountId, "actionSuggestRating")) {
+                $this->main->suggestLevel($accountId, $levelId, $difficulty["difficulty"], $starStars, $feature, $difficulty["auto"], $difficulty["demon"]);
                 return "1";
             }
 
@@ -487,28 +472,24 @@ class Level implements LevelInterface {
         }
     }
 
-    public function report(int $levelID, $hostname): string {
+    public function report(int $levelId, string $hostname): string {
         try {
-            $existingReport = $this->database->count(
+            $existingReport = $this->db->exists(
                 "reports",
-                "levelID = :levelID AND hostname = :hostname",
-                [
-                    ":levelID" => $levelID,
-                    ":hostname" => $hostname
-                ]
+                "levelID = ? AND hostname = ?",
+                [$levelId, $hostname]
             );
 
-            if ($existingReport > 0) {
+            if ($existingReport) {
                 return "-1";
             }
 
-            return (string)$this->database->insert(
-                "INSERT INTO reports (levelID, hostname) VALUES (:levelID, :hostname)",
-                [
-                    ":levelID" => $levelID,
-                    ":hostname" => $hostname
-                ]
-            );
+            $newId = $this->db->insert('reports', [
+                'levelID' => $levelId,
+                'hostname' => $hostname
+            ]);
+
+            return (string)$newId;
 
         } catch (Exception $e) {
             error_log("Level report error: " . $e->getMessage());
@@ -516,19 +497,17 @@ class Level implements LevelInterface {
         }
     }
 
-    public function updateDesc($accountID, int $levelID, string $levelDescription): string {
+    public function updateDesc(int $accountId, int $levelId, string $levelDescription): string {
         try {
             $rawDescription = $this->decodeLevelDescription($levelDescription);
             $processedDescription = $this->fixColorTags($rawDescription);
             $finalDescription = $this->encodeLevelDescription($processedDescription);
 
-            $this->database->execute(
-                "UPDATE levels SET levelDesc = :levelDesc WHERE levelID = :levelID AND extID = :extID",
-                [
-                    ":levelDesc" => $finalDescription,
-                    ":levelID" => $levelID,
-                    ":extID" => $accountID
-                ]
+            $this->db->update(
+                'levels',
+                ['levelDesc' => $finalDescription],
+                'levelID = ? AND extID = ?',
+                [$levelId, $accountId]
             );
 
             return "1";
@@ -555,60 +534,53 @@ class Level implements LevelInterface {
 
         if ($openTags > $closeTags) {
             $missingTags = $openTags - $closeTags;
-            for ($i = 0; $i < $missingTags; $i++) {
-                $description .= '</c>';
-            }
+            $description .= str_repeat('</c>', $missingTags);
         }
 
         return $description;
     }
 
     public function upload(
-        int $accountID, 
-        int $levelID, 
-        $userName,
-        $hostname,
-        $userID,
-        $levelName,
-        $audioTrack,
-        $levelLength,
-        $secret,
-        $levelString,
-        $gjp,
-        $levelVersion,
-        $ts,
-        $songs,
-        $sfxs,
-        $auto,
-        $original,
-        $twoPlayer,
-        $songID,
-        $object,
-        $coins,
-        $requestedStars,
-        $extraString,
-        $levelInfo,
-        $unlisted,
-        $unlisted2,
-        $ldm,
-        $wt,
-        $wt2,
-        $settingsString,
-        $levelDescription,
-        $password
+        int $accountId, 
+        int $levelId, 
+        string $userName,
+        string $hostname,
+        int $userId,
+        string $levelName,
+        int $audioTrack,
+        int $levelLength,
+        string $secret,
+        string $levelString,
+        string $gjp,
+        int $levelVersion,
+        int $ts,
+        string $songs,
+        string $sfxs,
+        int $auto,
+        int $original,
+        int $twoPlayer,
+        int $songId,
+        int $object,
+        int $coins,
+        int $requestedStars,
+        string $extraString,
+        string $levelInfo,
+        int $unlisted,
+        int $unlisted2,
+        int $ldm,
+        int $wt,
+        int $wt2,
+        string $settingsString,
+        string $levelDescription,
+        int $password
     ): int {
         try {
-            // Проверка ограничений по времени
-            $recentUploads = $this->database->count(
+            $recentUploads = $this->db->count(
                 "levels",
-                "uploadDate > :time AND (userID = :userID OR hostname = :ip)",
-                [
-                    ":time" => $this->uploadDate - 30,
-                    ":userID" => $userID,
-                    ":ip" => $hostname
-                ]
+                "uploadDate > ? AND (userID = ? OR hostname = ?)",
+                [$this->uploadDate - 30, $userId, $hostname]
             );
-
+            
             if ($recentUploads > 0) {
                 return -1;
             }
@@ -617,88 +589,62 @@ class Level implements LevelInterface {
                 return -1;
             }
 
-            // Данные для вставки/обновления
             $levelData = [
-                ":levelName" => $levelName,
-                ":gameVersion" => $this->gameVersion,
-                ":binaryVersion" => $this->binaryVersion,
-                ":userName" => $userName,
-                ":levelDesc" => $levelDescription,
-                ":levelVersion" => $levelVersion,
-                ":levelLength" => $levelLength,
-                ":audioTrack" => $audioTrack,
-                ":auto" => $auto,
-                ":password" => $password,
-                ":original" => $original,
-                ":twoPlayer" => $twoPlayer,
-                ":songID" => $songID,
-                ":objects" => $object,
-                ":coins" => $coins,
-                ":requestedStars" => $requestedStars,
-                ":extraString" => $extraString,
-                ":levelString" => $levelString,
-                ":levelInfo" => $levelInfo,
-                ":secret" => $secret,
-                ":updateDate" => $this->updateDate,
-                ":unlisted" => $unlisted,
-                ":hostname" => $hostname,
-                ":ldm" => $ldm,
-                ":wt" => $wt,
-                ":wt2" => $wt2,
-                ":unlisted2" => $unlisted2,
-                ":settingsString" => $settingsString,
-                ":songs" => $songs,
-                ":sfxs" => $sfxs,
-                ":ts" => $ts
+                'levelName' => $levelName,
+                'gameVersion' => $this->gameVersion,
+                'binaryVersion' => $this->binaryVersion,
+                'userName' => $userName,
+                'levelDesc' => $levelDescription,
+                'levelVersion' => $levelVersion,
+                'levelLength' => $levelLength,
+                'audioTrack' => $audioTrack,
+                'auto' => $auto,
+                'password' => $password,
+                'original' => $original,
+                'twoPlayer' => $twoPlayer,
+                'songID' => $songId,
+                'objects' => $object,
+                'coins' => $coins,
+                'requestedStars' => $requestedStars,
+                'extraString' => $extraString,
+                'levelString' => $levelString,
+                'levelInfo' => $levelInfo,
+                'secret' => $secret,
+                'updateDate' => $this->updateDate,
+                'unlisted' => $unlisted,
+                'hostname' => $hostname,
+                'isLDM' => $ldm,
+                'wt' => $wt,
+                'wt2' => $wt2,
+                'unlisted2' => $unlisted2,
+                'settingsString' => $settingsString,
+                'songIDs' => $songs,
+                'sfxIDs' => $sfxs,
+                'ts' => $ts
             ];
 
-            if ($this->existLevel($levelName, $userID) == 1) {
-                // Обновление существующего уровня
-                $levelData[":id"] = $accountID;
-                $this->database->execute(
-                    "UPDATE levels SET 
-                     levelName = :levelName, gameVersion = :gameVersion, binaryVersion = :binaryVersion, 
-                     userName = :userName, levelDesc = :levelDesc, levelVersion = :levelVersion, 
-                     levelLength = :levelLength, audioTrack = :audioTrack, auto = :auto, 
-                     password = :password, original = :original, twoPlayer = :twoPlayer, 
-                     songID = :songID, objects = :objects, coins = :coins, 
-                     requestedStars = :requestedStars, extraString = :extraString, 
-                     levelString = :levelString, levelInfo = :levelInfo, secret = :secret, 
-                     updateDate = :updateDate, unlisted = :unlisted, hostname = :hostname, 
-                     isLDM = :ldm, wt = :wt, wt2 = :wt2, unlisted2 = :unlisted2, 
-                     settingsString = :settingsString, songIDs = :songs, sfxIDs = :sfxs, ts = :ts 
-                     WHERE levelName = :levelName AND extID = :id",
-                    $levelData
+            if ($this->existLevel($levelName, $userId) == 1) {
+                $levelData['extID'] = $accountId;
+                
+                $this->db->update(
+                    'levels',
+                    $levelData,
+                    'levelName = ? AND extID = ?',
+                    [$levelName, $accountId]
                 );
                 
-                $this->saveLevelFile($levelID, $levelString);
-                return $levelID;
-            } else {
-                // Создание нового уровня
-                $levelData[":uploadDate"] = $this->uploadDate;
-                $levelData[":userID"] = $userID;
-                $levelData[":id"] = $accountID;
-
-                $newLevelID = $this->database->insert(
-                    "INSERT INTO levels (
-                     levelName, gameVersion, binaryVersion, userName, levelDesc, levelVersion, 
-                     levelLength, audioTrack, auto, password, original, twoPlayer, songID, 
-                     objects, coins, requestedStars, extraString, levelString, levelInfo, 
-                     secret, uploadDate, userID, extID, updateDate, unlisted, hostname, 
-                     isLDM, wt, wt2, unlisted2, settingsString, songIDs, sfxIDs, ts
-                     ) VALUES (
-                     :levelName, :gameVersion, :binaryVersion, :userName, :levelDesc, :levelVersion,
-                     :levelLength, :audioTrack, :auto, :password, :original, :twoPlayer, :songID,
-                     :objects, :coins, :requestedStars, :extraString, :levelString, :levelInfo,
-                     :secret, :uploadDate, :userID, :id, :updateDate, :unlisted, :hostname,
-                     :ldm, :wt, :wt2, :unlisted2, :settingsString, :songs, :sfxs, :ts
-                     )",
-                    $levelData
-                );
-                
-                $this->saveLevelFile($newLevelID, $levelString);
-                return $newLevelID;
+                $this->saveLevelFile($levelId, $levelString);
+                return $levelId;
             }
+            
+            $levelData['uploadDate'] = $this->uploadDate;
+            $levelData['userID'] = $userId;
+            $levelData['extID'] = $accountId;
+
+            $newLevelId = $this->db->insert('levels', $levelData);
+            
+            $this->saveLevelFile($newLevelId, $levelString);
+            return $newLevelId;
 
         } catch (Exception $e) {
             error_log("Level upload error: " . $e->getMessage());
@@ -706,12 +652,12 @@ class Level implements LevelInterface {
         }
     }
 
-    private function saveLevelFile(int $levelID, string $levelString): void {
+    private function saveLevelFile(int $levelId, string $levelString): void {
         $levelDir = __DIR__ . "/../database/data/levels";
         if (!is_dir($levelDir)) {
             mkdir($levelDir, 0755, true);
         }
         
-        file_put_contents("$levelDir/$levelID", $levelString);
+        file_put_contents("$levelDir/$levelId", $levelString);
     }
 }

@@ -5,29 +5,29 @@ require_once __DIR__."/lib/Lib.php";
 
 interface Communication {
     public function getData(
-        int $accountID = 0, 
-        int $userID = 0, 
+        int $accountId = 0, 
+        int $userId = 0, 
         int $page, 
         int $getSent = 0, 
-        int $levelID = 0, 
+        int $levelId = 0, 
         int $gameVersion = 0, 
         int $binaryVersion = 0
     ): string;
     
     public function delete(
-        int $accountID, 
-        int $userID, 
+        int $accountId, 
+        int $userId, 
         int $permission = 0, 
-        int $commentID = 0, 
-        int $messageID = 0, 
+        int $commentId = 0, 
+        int $messageId = 0, 
         string $messages = ""
     ): string;
     
     public function upload(
-        int $accountID, 
-        int $userID, 
-        int $levelID = 0, 
-        int $toAccountID = 0, 
+        int $accountId, 
+        int $userId, 
+        int $levelId = 0, 
+        int $toAccountId = 0, 
         string $userName = "", 
         string $comment = "", 
         string $subject = "", 
@@ -35,12 +35,13 @@ interface Communication {
         string $secret = ""
     ): string;
     
-    public function download(int $accountID, int $messageID, int $isSender): string;
+    public function download(int $accountId, int $messageId, int $isSender): string;
 }
 
 class Message implements Communication {
-    protected $database;
-    protected $main, $lib;
+    protected Database $database;
+    protected Main $main;
+    protected Lib $lib;
 
     public function __construct() {
         $this->database = new Database();
@@ -48,40 +49,57 @@ class Message implements Communication {
         $this->lib = new Lib();
     }
 
-    public function download(int $accountID, int $messageID, int $isSender): string {
+    public function download(int $accountId, int $messageId, int $isSender): string {
         try {
-            $message = $this->database->fetch_one(
+            $message = $this->database->fetchOne(
                 "SELECT accID, toAccountID, timestamp, userName, messageID, subject, isNew, body 
                  FROM messages 
-                 WHERE messageID = :messageID AND (accID = :accountID OR toAccountID = :accountID) 
+                 WHERE messageID = ? AND (accID = ? OR toAccountID = ?) 
                  LIMIT 1",
-                [":messageID" => $messageID, ":accountID" => $accountID]
+                [$messageId, $accountId, $accountId]
             );
 
-            if (!$message) return "-1";
+            if (!$message) {
+                return "-1";
+            }
 
             if (empty($isSender)) {
-                $this->database->execute(
-                    "UPDATE messages SET isNew = 1 WHERE messageID = :messageID AND toAccountID = :accountID",
-                    [":messageID" => $messageID, ":accountID" => $accountID]
+                $this->database->update(
+                    'messages',
+                    ['isNew' => 1],
+                    'messageID = ? AND toAccountID = ?',
+                    [$messageId, $accountId]
                 );
-                $targetAccountID = $message['accID'];
+                $targetAccountId = $message['accID'];
                 $isSender = 0;
             } else {
-                $targetAccountID = $message['toAccountID'];
+                $targetAccountId = $message['toAccountID'];
                 $isSender = 1;
             }
 
-            $user = $this->database->fetch_one(
-                "SELECT userName, userID, extID FROM users WHERE extID = :accountID",
-                [":accountID" => $targetAccountID]
+            $user = $this->database->fetchOne(
+                "SELECT userName, userID, extID FROM users WHERE extID = ?",
+                [$targetAccountId]
             );
 
-            if (!$user) return "-1";
+            if (!$user) {
+                return "-1";
+            }
 
-            $uploadDate = $this->lib->make_time($message["timestamp"]);
+            $uploadDate = $this->lib->makeTime($message["timestamp"]);
 
-            return "6:".$user["userName"].":3:".$user["userID"].":2:".$user["extID"].":1:".$message["messageID"].":4:".$message["subject"].":8:".$message["isNew"].":9:".$isSender.":5:".$message["body"].":7:".$uploadDate;
+            return sprintf(
+                "6:%s:3:%d:2:%d:1:%d:4:%s:8:%d:9:%d:5:%s:7:%s",
+                $user["userName"],
+                $user["userID"],
+                $user["extID"],
+                $message["messageID"],
+                $message["subject"],
+                $message["isNew"],
+                $isSender,
+                $message["body"],
+                $uploadDate
+            );
 
         } catch (Exception $e) {
             error_log("Message download error: " . $e->getMessage());
@@ -89,51 +107,55 @@ class Message implements Communication {
         }
     }
 
-    public function upload(int $accountID, int $userID, int $levelID = 0, int $toAccountID = 0, string $userName = "", string $comment = "", string $subject = "", string $body = "", string $secret = ""): string {
+    public function upload(int $accountId, int $userId, int $levelId = 0, int $toAccountId = 0, string $userName = "", string $comment = "", string $subject = "", string $body = "", string $secret = ""): string {
         try {
-            if ($accountID == $toAccountID) return "-1";
+            if ($accountId == $toAccountId) {
+                return "-1";
+            }
 
-            $userName = $this->database->fetch_column(
-                "SELECT userName FROM users WHERE extID = :accountID ORDER BY userName DESC LIMIT 1",
-                [":accountID" => $accountID]
+            $senderName = $this->database->fetchColumn(
+                "SELECT userName FROM users WHERE extID = ? ORDER BY userName DESC LIMIT 1",
+                [$accountId]
             );
 
-            if (!$userName) return "-1";
+            if (!$senderName) {
+                return "-1";
+            }
 
             $isBlocked = $this->database->exists(
                 "blocks", 
-                "person1 = :toAccountID AND person2 = :accountID",
-                [":toAccountID" => $toAccountID, ":accountID" => $accountID]
+                "person1 = ? AND person2 = ?",
+                [$toAccountId, $accountId]
             );
 
-            $messageSettings = $this->database->fetch_column(
-                "SELECT mS FROM accounts WHERE accountID = :accountID AND mS > 0",
-                [":accountID" => $accountID]
+            $messageSettings = $this->database->fetchColumn(
+                "SELECT mS FROM accounts WHERE accountID = ? AND mS > 0",
+                [$accountId]
             );
 
             $isFriend = $this->database->exists(
                 "friendships",
-                "(person1 = :accountID AND person2 = :toAccountID) OR (person2 = :accountID AND person1 = :toAccountID)",
-                [":accountID" => $accountID, ":toAccountID" => $toAccountID]
+                "(person1 = ? AND person2 = ?) OR (person2 = ? AND person1 = ?)",
+                [$accountId, $toAccountId, $accountId, $toAccountId]
             );
 
-            if (!empty($messageSettings) && $messageSettings == 2) return "-1";
-            if ($isBlocked || (empty($messageSettings) && empty($isFriend))) return "-1";
+            if (!empty($messageSettings) && $messageSettings == 2) {
+                return "-1";
+            }
+            if ($isBlocked || (empty($messageSettings) && empty($isFriend))) {
+                return "-1";
+            }
 
-            $this->database->insert(
-                "INSERT INTO messages (subject, body, accID, userID, userName, toAccountID, secret, timestamp) 
-                 VALUES (:subject, :body, :accID, :userID, :userName, :toAccountID, :secret, :uploadDate)",
-                [
-                    ':subject' => $subject, 
-                    ':body' => $body, 
-                    ':accID' => $accountID, 
-                    ':userID' => $userID, 
-                    ':userName' => $userName, 
-                    ':toAccountID' => $toAccountID, 
-                    ':secret' => $secret, 
-                    ':uploadDate' => time()
-                ]
-            );
+            $this->database->insert('messages', [
+                'subject' => $subject,
+                'body' => $body,
+                'accID' => $accountId,
+                'userID' => $userId,
+                'userName' => $senderName,
+                'toAccountID' => $toAccountId,
+                'secret' => $secret,
+                'timestamp' => time()
+            ]);
 
             return "1";
 
@@ -143,54 +165,69 @@ class Message implements Communication {
         }
     }
     
-    public function getData(int $accountID = 0, int $userID = 0, int $page, int $getSent = 0, int $levelID = 0, int $gameVersion = 0, int $binaryVersion = 0): string {
+    public function getData(int $accountId = 0, int $userId = 0, int $page, int $getSent = 0, int $levelId = 0, int $gameVersion = 0, int $binaryVersion = 0): string {
         try {
             $offset = $page * 10;
-            $messageString = "";
 
-            if (!isset($getSent) || $getSent != 1) {
-                $messages = $this->database->fetch_all(
+            if (empty($getSent)) {
+                $messages = $this->database->fetchAll(
                     "SELECT * FROM messages 
-                     WHERE toAccountID = :accountID 
+                     WHERE toAccountID = ? 
                      ORDER BY messageID DESC 
-                     LIMIT 10 OFFSET :offset",
-                    [":accountID" => $accountID, ":offset" => $offset]
+                     LIMIT 10 OFFSET ?",
+                    [$accountId, $offset]
                 );
                 
-                $totalCount = $this->database->count("messages", "toAccountID = :accountID", [":accountID" => $accountID]);
+                $totalCount = $this->database->count("messages", "toAccountID = ?", [$accountId]);
                 $getSent = 0;
             } else {
-                $messages = $this->database->fetch_all(
+                $messages = $this->database->fetchAll(
                     "SELECT * FROM messages 
-                     WHERE accID = :accountID 
+                     WHERE accID = ? 
                      ORDER BY messageID DESC 
-                     LIMIT 10 OFFSET :offset",
-                    [":accountID" => $accountID, ":offset" => $offset]
+                     LIMIT 10 OFFSET ?",
+                    [$accountId, $offset]
                 );
                 
-                $totalCount = $this->database->count("messages", "accID = :accountID", [":accountID" => $accountID]);
+                $totalCount = $this->database->count("messages", "accID = ?", [$accountId]);
                 $getSent = 1;
             }
 
-            if (empty($messages)) return "-2";
+            if (empty($messages)) {
+                return "-2";
+            }
+
+            $messageString = "";
 
             foreach ($messages as $message) {
-                $targetAccountID = ($getSent == 1) ? $message["toAccountID"] : $message["accID"];
+                $targetAccountId = ($getSent == 1) ? $message["toAccountID"] : $message["accID"];
                 
-                $user = $this->database->fetch_one(
-                    "SELECT * FROM users WHERE extID = :accountID",
-                    [":accountID" => $targetAccountID]
+                $user = $this->database->fetchOne(
+                    "SELECT * FROM users WHERE extID = ?",
+                    [$targetAccountId]
                 );
 
-                if (!$user) continue;
+                if (!$user) {
+                    continue;
+                }
 
-                $uploadDate = $this->lib->make_time($message["timestamp"]);
-                $messageString .= "6:".$user["userName"].":3:".$user["userID"].":2:".$user["extID"].":1:".$message["messageID"].":4:".$message["subject"].":8:".$message["isNew"].":9:".$getSent.":7:".$uploadDate."|";
+                $uploadDate = $this->lib->makeTime($message["timestamp"]);
+                $messageString .= sprintf(
+                    "6:%s:3:%d:2:%d:1:%d:4:%s:8:%d:9:%d:7:%s|",
+                    $user["userName"],
+                    $user["userID"],
+                    $user["extID"],
+                    $message["messageID"],
+                    $message["subject"],
+                    $message["isNew"],
+                    $getSent,
+                    $uploadDate
+                );
             }
 
             $messageString = rtrim($messageString, "|");
 
-            return $messageString."#".$totalCount.":".$offset.":10";
+            return $messageString . "#" . $totalCount . ":" . $offset . ":10";
 
         } catch (Exception $e) {
             error_log("Message getData error: " . $e->getMessage());
@@ -198,30 +235,33 @@ class Message implements Communication {
         }
     }
 
-    public function delete(int $accountID, int $userID, int $permission = 0, int $commentID = 0, int $messageID = 0, string $messages = ""): string {
+    public function delete(int $accountId, int $userId, int $permission = 0, int $commentId = 0, int $messageId = 0, string $messages = ""): string {
         try {
             if (!empty($messages)) {
-                $messageIDs = explode(",", $messages);
-                $placeholders = implode(",", array_fill(0, count($messageIDs), "?"));
+                $messageIds = explode(",", $messages);
                 
-                $this->database->execute(
-                    "DELETE FROM messages WHERE messageID IN ($placeholders) AND accID = ? LIMIT 10",
-                    array_merge($messageIDs, [$accountID])
-                );
-                
-                $this->database->execute(
-                    "DELETE FROM messages WHERE messageID IN ($placeholders) AND toAccountID = ? LIMIT 10",
-                    array_merge($messageIDs, [$accountID])
-                );
+                foreach ($messageIds as $id) {
+                    $this->database->delete(
+                        'messages',
+                        'messageID = ? AND accID = ?',
+                        [(int)$id, $accountId]
+                    );
+                    $this->database->delete(
+                        'messages',
+                        'messageID = ? AND toAccountID = ?',
+                        [(int)$id, $accountId]
+                    );
+                }
             } else {
-                $this->database->execute(
-                    "DELETE FROM messages WHERE messageID = :messageID AND accID = :accountID LIMIT 1",
-                    [":messageID" => $messageID, ":accountID" => $accountID]
+                $this->database->delete(
+                    'messages',
+                    'messageID = ? AND accID = ?',
+                    [$messageId, $accountId]
                 );
-                
-                $this->database->execute(
-                    "DELETE FROM messages WHERE messageID = :messageID AND toAccountID = :accountID LIMIT 1",
-                    [":messageID" => $messageID, ":accountID" => $accountID]
+                $this->database->delete(
+                    'messages',
+                    'messageID = ? AND toAccountID = ?',
+                    [$messageId, $accountId]
                 );
             }
 

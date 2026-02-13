@@ -4,22 +4,22 @@ require_once __DIR__ . "/lib/Database.php";
 require_once __DIR__ . "/lib/generateHash.php";
 
 interface GauntletInterface {
-    public function get_data(): string;
+    public function getData(): string;
 }
 
 class GauntletPack implements GauntletInterface {
-    private $database;
+    private Database $database;
     
     public function __construct() { 
         $this->database = new Database();
     }
 
-    public function get_data(): string {
+    public function getData(): string {
         try {
             $gauntletString = "";
             $hashString = "";
 
-            $gauntlets = $this->database->fetch_all(
+            $gauntlets = $this->database->fetchAll(
                 "SELECT ID, level1, level2, level3, level4, level5 
                  FROM gauntlets 
                  WHERE level5 != '0' 
@@ -37,13 +37,12 @@ class GauntletPack implements GauntletInterface {
             }
 
             $gauntletString = rtrim($gauntletString, "|");
-
             $hash = GenerateHash::genSolo2($hashString);
 
             return $gauntletString . "#" . $hash;
 
         } catch (Exception $e) {
-            error_log("GauntletPack get_data error: " . $e->getMessage());
+            error_log("GauntletPack getData error: " . $e->getMessage());
             return "#" . GenerateHash::genSolo2("");
         }
     }

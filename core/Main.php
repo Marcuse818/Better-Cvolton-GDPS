@@ -1,349 +1,425 @@
 <?php 
-    require_once __DIR__."/lib/Database.php";
-    require_once __DIR__."/lib/exploitPatch.php";
-    require_once __DIR__."/lib/GJPCheck.php";
-    include_once __DIR__."/lib/ip_in_range.php";
+require_once __DIR__."/lib/Database.php";
+require_once __DIR__."/lib/exploitPatch.php";
+require_once __DIR__."/lib/GJPCheck.php";
+include_once __DIR__."/lib/ip_in_range.php";
 
-    require_once __DIR__."/../config/security.php";
+require_once __DIR__."/../config/security.php";
 
-    class Main extends SecurityConfig {
-        private $connection;
-        private $friends, $max_permission, $role_id_list;
-        private $id, $user_id;
+class Main extends SecurityConfig {
+    private Database $db;
+    private ?array $friends = null;
+    private int $maxPermission = 0;
+    private ?string $id = null;
+    private ?int $userId = null;
 
-        public function __construct() {
-            $new_con = new Database();
+    public function __construct() {
+        $this->db = new Database();
+        $this->maxPermission = 0;
+    }
 
-            $this->connection = $new_con->open_connection();
-            $this->max_permission = 0;
-        }
-
-        public function getRolePermission(int $accountID, string $permission) 
-        {
-            if(!is_numeric($accountID)) return false;
-            
-            $roleID = $this->connection->prepare("SELECT roleID FROM roleassign WHERE accountID = :accountID");
-            $roleID->execute([':accountID' => $accountID]);
-
-            if ($roleID->rowCount() == 0) return false;
-
-            $roleID = $roleID->fetch();
-
-            $permissions = $this->connection->prepare("SELECT $permission FROM roles WHERE roleID = " . (int) $roleID["roleID"]);
-            $permissions->execute();
-            $permissions = $permissions->fetch();
-
-            return $permissions[$permission];
-        }
-
-        public function feature_level($accountID, $levelID, $state) {
-            if(!is_numeric($accountID)) return false;
-
-            $states = $this->get_state($state);
-            $featured = $states["featured"];
-            $epic = $states["epic"];
-
-            $feature = $this->connection->prepare("UPDATE levels SET starFeatured = :feature, starEpic = :epic WHERE levelID = :levelID");	
-            $feature->execute([':feature' => $featured, ':epic' => $epic, ':levelID' => $levelID]);
-
-            $feature = $this->connection->prepare("INSERT INTO modactions (type, value, value3, timestamp, account) VALUES ('2', :value, :levelID, :timestamp, :id)");
-            $feature->execute([':value' => $state, ':timestamp' => time(), ':id' => $accountID, ':levelID' => $levelID]);
-        }
-
-        public function get_state(int $state): array {
-            switch ($state)
-            {
-                case 0: 
-                    $featured = 0;
-                    $epic = 0;
-                    break;
-                    
-                case 1:
-                    $featured = 1;
-                    $epic = 0;
-                    break;
-                
-                case 2:
-                    $featured = 1;
-                    $epic = 1;
-                    break;
-                    
-                case 3:
-                    $featured = 1;
-                    $epic = 2;
-                    break;
-                    
-                case 4: 
-                    $featured = 1;
-                    $epic = 3;
-                    break;
-            }
-            
-            
-            return array("featured" => $featured, "epic" => $epic);
+    public function getRolePermission(int $accountId, string $permission): mixed {
+        if (!is_numeric($accountId)) {
+            return false;
         }
         
-        public function get_owner_list($list_id) {
-            if (!is_numeric($list_id)) return false;
-            
-            $owner_list = $this->connection->prepare("SELECT accountID FROM lists WHERE listID = :id");
-            $owner_list->execute([":id" => $list_id]);
-            
-            return $owner_list->fetchColumn();
-        }
-    
-        public function get_list_levels($list_id) {
-            if (!is_numeric($list_id)) return false;
-        
-            $list_levels = $this->connection->prepare("SELECT listlevels FROM lists WHERE listID = :id");
-            $list_levels->execute([":id" => $list_id]);
-            
-            return $list_levels->fetchColumn();
-        }
-        
-        public function get_list_difficulty_name($difficulty) {
-            if ($difficulty == -1) return "N/A";
-            
-            $diffs = ['Auto', 'Easy', 'Normal', 'Hard', 'Harder', 'Insane', 'Easy Demon', 'Medium Demon', 'Hard Demon', 'Insane Demon', 'Extreme Demon'];
-            
-            return $diffs[$difficulty];
-        }
+        $roleId = $this->db->fetchColumn(
+            "SELECT roleID FROM roleassign WHERE accountID = ?",
+            [$accountId]
+        );
 
-        public function get_difficulty(int $stars = 0, string $name = "N/A", string $type = "name"): array {
-            switch($type) {
-                case "name":
-                    $auto = ($name == "auto") ? 1 : 0;
-                    $demon = ($name == "demon") ? 1 : 0;
-                    
-                    $difficulty = array(
-                        "N/A" => 0,
-                        "auto" => 50,
-                        "easy" => 10,
-                        "normal" => 20,
-                        "hard" => 30,
-                        "harder" => 40,
-                        "insane" => 50,
-                        "demon" => 50
-                    );
-                
-                    return array($difficulty[$name], $demon, $auto);
-                
-                case "stars":
-                    $auto = ($stars == 1) ? 1 : 0;
-                    $demon = ($stars == 10) ? 1 : 0;
-
-                    $difficulty_name = ["N/A", "Auto", "Easy", "Normal", "Hard", "Hard", "Harder", "Harder", "Insane", "Insane", "Demon"];
-                    $difficulty = [0, 50, 10, 20, 30, 30, 40, 40, 50, 50, 50];
-
-                    return array("difficulty" => $difficulty[$stars], "auto" => $auto, "demon" => $demon, "name" => $difficulty_name[$stars]);
-            }
-
-            return array(0, 0, 0);
-        }
-        
-        public function get_list_levels_name($list_id) {
-            if (!is_numeric($list_id)) return false;
-            
-            $list_levels_name = $this->connection->prepare("SELECT listName FROM lists WHERE listID = :id");
-            $list_levels_name->execute([":id" => $list_id]);
-            
-            return $list_levels_name->fetchColumn();
-        }
-        
-        public function get_post_id() {
-            if(!empty($_POST["udid"]) && $_POST['gameVersion'] < 20 && self::$unregisteredSubmissions) 
-            {
-                $this->id = ExploitPatch::remove($_POST["udid"]);
-                if(is_numeric($this->id)) exit("-1");
-            }
-            elseif(!empty($_POST["accountID"]) && $_POST["accountID"] != "0")
-            {
-                $this->id = GJPCheck::getAccountIDOrDie();
-            }
-            else
-            {
-                exit("-1");
-            }
-
-            return $this->id;
-        }
-
-        public function get_ip() {
-            if (isset($_SERVER['HTTP_CF_CONNECTING_IP']) && $this->is_cloudflare_ip($_SERVER['REMOTE_ADDR']))
-                return $_SERVER['HTTP_CF_CONNECTING_IP'];
-
-            if(isset($_SERVER['HTTP_X_FORWARDED_FOR']) && ipInRange::ipv4_in_range($_SERVER['REMOTE_ADDR'], '127.0.0.0/8'))
-                return $_SERVER['HTTP_X_FORWARDED_FOR'];
-
-            return $_SERVER['REMOTE_ADDR'];
-        }
-
-        public function get_id_from_name(string $userName): int {
-            $query = $this->connection->prepare("SELECT accountID FROM accounts WHERE userName LIKE :userName");
-            $query->execute([':userName' => $userName]);
-
-            $accountID = ($query->rowCount() > 0) ? $query->fetchColumn() : 0;
-
-            return $accountID;
-        }
-
-        public function get_user_id($extID, $userName = "Undefined") {
-            $register = (is_numeric($extID)) ? 1 : 0;
-    
-            $query = $this->connection->prepare("SELECT userID FROM users WHERE extID LIKE BINARY :id");
-            $query->execute([':id' => $extID]);
-
-            if ($query->rowCount() > 0) 
-            {
-                $this->user_id = $query->fetchColumn();
-            } 
-            else 
-            {
-                $query = $this->connection->prepare("INSERT INTO users (isRegistered, extID, userName, lastPlayed) VALUES (:register, :id, :userName, :uploadDate)");
-    
-                $query->execute([':id' => $extID, ':register' => $register, ':userName' => $userName, ':uploadDate' => time()]);
-                $this->user_id = $this->connection->lastInsertId();
-            }
-
-            return $this->user_id;
-        }
-
-        public function get_friends($accountID) {
-            if(!is_numeric($accountID)) return false;
-    
-            $query = $this->connection->prepare("SELECT person1,person2 FROM friendships WHERE person1 = :accountID OR person2 = :accountID");
-            $query->execute([':accountID' => $accountID]);
-            $result = $query->fetchAll();
-
-            if($query->rowCount() == 0)
-            {
-                return array();
-            }
-            else
-            {
-                foreach($result as &$friendship) {
-                    $person = $friendship["person1"];
-
-                    if($friendship["person1"] == $accountID) $person = $friendship["person2"];
-                    
-                    $this->friends[] = $person;
-                }
-            }
-
-            return $this->friends;
-        }
-
-        public function get_song_string($song) {
-            if($song['ID'] == 0 || empty($song['ID'])) return false;
-           
-            if($song["isDisabled"] == 1) return false;
-
-            $dl = $song["download"];
-
-            if(strpos($dl, ':') !== false) $dl = urlencode($dl);
-            
-            return "1~|~".$song["ID"]."~|~2~|~".str_replace("#", "", $song["name"])."~|~3~|~".$song["authorID"]."~|~4~|~".$song["authorName"]."~|~5~|~".$song["size"]."~|~6~|~~|~10~|~".$dl."~|~7~|~~|~8~|~1";
-        }
-        
-        public function get_user_string($userdata) {
-            $extID = is_numeric($userdata['extID']) ? $userdata['extID'] : 0;
-            return $userdata['userID'].":".$userdata['userName'].":".$extID;
-        }
-
-        public function is_cloudflare_ip($ip) {
-            $cf_ips = array(
-                '173.245.48.0/20',
-                '103.21.244.0/22',
-                '103.22.200.0/22',
-                '103.31.4.0/22',
-                '141.101.64.0/18',
-                '108.162.192.0/18',
-                '190.93.240.0/20',
-                '188.114.96.0/20',
-                '197.234.240.0/22',
-                '198.41.128.0/17',
-                '162.158.0.0/15',
-                '104.16.0.0/13',
-                '104.24.0.0/14',
-                '172.64.0.0/13',
-                '131.0.72.0/22'
-            );
-
-            foreach ($cf_ips as $cf_ip) if (ipInRange::ipv4_in_range($ip, $cf_ip)) return true;
-
+        if (!$roleId) {
             return false;
         }
 
-        public function is_friends($accountID, $targetAccountID) {
-            if(!is_numeric($accountID) || !is_numeric($targetAccountID)) return false;
-    
-            $friendships = $this->connection->prepare("SELECT count(*) FROM friendships WHERE person1 = :accountID AND person2 = :targetAccountID OR person1 = :targetAccountID AND person2 = :accountID");
-            $friendships->execute([':accountID' => $accountID, ':targetAccountID' => $targetAccountID]);
-            
-            return $friendships->fetchColumn() > 0;
-        }
-
-        public function rate_level($accountID, $levelID, $stars, $difficulty, $auto, $demon) {
-            if(!is_numeric($accountID)) return false;
-    
-            $query = $this->connection->prepare("UPDATE levels SET starDemon = :demon, starAuto = :auto, starDifficulty = :diff, starStars = :stars, rateDate = :now WHERE levelID = :levelID");	
-            $query->execute([':demon' => $demon, ':auto' => $auto, ':diff' => $difficulty, ':stars' => $stars, ':levelID'=>$levelID, ':now' => time()]);
-            
-            $diff = $this->get_difficulty($stars, "", "stars");
-            
-            $query = $this->connection->prepare("INSERT INTO modactions (type, value, value2, value3, timestamp, account) VALUES ('1', :value, :value2, :levelID, :timestamp, :id)");
-            $query->execute([':value' => $diff["name"], ':timestamp' => time(), ':id' => $accountID, ':value2' => $stars, ':levelID' => $levelID]);
-        }
-
-	    public function suggest_level($accountID, $levelID, $difficulty, $stars, $feat, $auto, $demon) {
-		    if(!is_numeric($accountID)) return false;
-		    
-		    $state = $this->get_state($feat);
-            $featured = $state["featured"];
-           	$epic = $state["epic"];
-            
-		    $rate_level = $this->connection->prepare("INSERT INTO sendLevel (accountID, levelID, difficulty, stars, featured, state, auto, demon, timestamp) VALUES (:account, :level, :diff, :stars, :featured, :state, :auto, :demon, :timestamp)");
-		    $rate_level->execute([':account' => $accountID, ':level' => $levelID, ':diff' => $difficulty, ':stars' => $stars, ':featured' => $featured, ':state' => $epic, ':auto' => $auto, ':demon' => $demon, ':timestamp' => time()]);
-	    }
-
-        public function verify_coins($accountID, $levelID, $coins) {
-            if(!is_numeric($accountID)) return false;
-    
-            $verify = $this->connection->prepare("UPDATE levels SET starCoins = :coins WHERE levelID = :levelID");	
-            $verify->execute([':coins' => $coins, ':levelID' => $levelID]);
-            
-            $verify = $this->connection->prepare("INSERT INTO modactions (type, value, value3, timestamp, account) VALUES ('3', :value, :levelID, :timestamp, :id)");
-            $verify->execute([':value' => $coins, ':timestamp' => time(), ':id' => $accountID, ':levelID' => $levelID]);
-        }
-
-        public function add_gauntlet_level($gauntlet) {
-            $levels_gauntlet = $this->connection->prepare("SELECT * FROM gauntlets WHERE ID = :gauntlet");
-            $levels_gauntlet->execute([":gauntlet" => $gauntlet]);
-            $levels_gauntlet = $levels_gauntlet->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($levels_gauntlet as &$level) {
-                for ($x = 1; $x <= 5; $x++) {
-                    $get_data = $this->connection->prepare('SELECT ID FROM gauntlets WHERE level' . $x . ' = :levelID');
-                    $get_data->execute([':levelID' => $level['level' . $x]]);
-                    $get_data = $get_data->fetch(PDO::FETCH_ASSOC);
-                
-                    $this->update_gauntlet_level($get_data['ID'], $x, $level['level' . $x]);
-                }
-            }
-            
-            return true;
-        }
-
-        public function update_gauntlet_level(int $gauntletID , int $levelPos, int $level) {
-            $update = $this->connection->prepare("UPDATE levels SET gauntletID = :gauntletID, gauntletLevel = :gauntletLevel WHERE levelID = :levelID");
-            $update->execute([":gauntletID" => $gauntletID, ":gauntletLevel" => $levelPos, ":levelID" => $level]);
-        }
-
-        public static function format_bytes($bytes, $precision = 2) { 
-            $bytes = log($bytes, 1024); 
-            $pow = pow(1024, $bytes - floor($bytes));  
-
-            return round($pow, $precision); 
-        }
+        return $this->db->fetchColumn(
+            "SELECT {$permission} FROM roles WHERE roleID = ?",
+            [$roleId]
+        );
     }
-?>
+
+    public function featureLevel(int $accountId, int $levelId, int $state): void {
+        if (!is_numeric($accountId)) {
+            return;
+        }
+
+        $stateData = $this->getState($state);
+        
+        $this->db->update(
+            'levels',
+            [
+                'starFeatured' => $stateData["featured"],
+                'starEpic' => $stateData["epic"]
+            ],
+            'levelID = ?',
+            [$levelId]
+        );
+
+        $this->db->insert('modactions', [
+            'type' => 2,
+            'value' => $state,
+            'value3' => $levelId,
+            'timestamp' => time(),
+            'account' => $accountId
+        ]);
+    }
+
+    public function getState(int $state): array {
+        $states = [
+            0 => ['featured' => 0, 'epic' => 0],
+            1 => ['featured' => 1, 'epic' => 0],
+            2 => ['featured' => 1, 'epic' => 1],
+            3 => ['featured' => 1, 'epic' => 2],
+            4 => ['featured' => 1, 'epic' => 3]
+        ];
+
+        return $states[$state] ?? $states[0];
+    }
+    
+    public function getOwnerList(int $listId): ?int {
+        if (!is_numeric($listId)) {
+            return null;
+        }
+        
+        return $this->db->fetchColumn(
+            "SELECT accountID FROM lists WHERE listID = ?",
+            [$listId]
+        );
+    }
+
+    public function getListLevels(int $listId): ?string {
+        if (!is_numeric($listId)) {
+            return null;
+        }
+        
+        return $this->db->fetchColumn(
+            "SELECT listlevels FROM lists WHERE listID = ?",
+            [$listId]
+        );
+    }
+    
+    public function getListDifficultyName(int $difficulty): string {
+        if ($difficulty == -1) {
+            return "N/A";
+        }
+        
+        $diffs = ['Auto', 'Easy', 'Normal', 'Hard', 'Harder', 'Insane', 
+                  'Easy Demon', 'Medium Demon', 'Hard Demon', 'Insane Demon', 'Extreme Demon'];
+        
+        return $diffs[$difficulty] ?? "N/A";
+    }
+
+    public function getDifficulty(int $stars = 0, string $name = "N/A", string $type = "name"): array {
+        switch ($type) {
+            case "name":
+                $auto = ($name == "auto") ? 1 : 0;
+                $demon = ($name == "demon") ? 1 : 0;
+                
+                $difficulty = [
+                    "N/A" => 0,
+                    "auto" => 50,
+                    "easy" => 10,
+                    "normal" => 20,
+                    "hard" => 30,
+                    "harder" => 40,
+                    "insane" => 50,
+                    "demon" => 50
+                ];
+            
+                return [
+                    'difficulty' => $difficulty[$name] ?? 0,
+                    'demon' => $demon,
+                    'auto' => $auto
+                ];
+            
+            case "stars":
+                $auto = ($stars == 1) ? 1 : 0;
+                $demon = ($stars == 10) ? 1 : 0;
+
+                $difficultyName = ["N/A", "Auto", "Easy", "Normal", "Hard", "Hard", 
+                                   "Harder", "Harder", "Insane", "Insane", "Demon"];
+                $difficulty = [0, 50, 10, 20, 30, 30, 40, 40, 50, 50, 50];
+
+                return [
+                    'difficulty' => $difficulty[$stars] ?? 0,
+                    'auto' => $auto,
+                    'demon' => $demon,
+                    'name' => $difficultyName[$stars] ?? "N/A"
+                ];
+        }
+
+        return ['difficulty' => 0, 'auto' => 0, 'demon' => 0, 'name' => "N/A"];
+    }
+    
+    public function getListLevelsName(int $listId): ?string {
+        if (!is_numeric($listId)) {
+            return null;
+        }
+        
+        return $this->db->fetchColumn(
+            "SELECT listName FROM lists WHERE listID = ?",
+            [$listId]
+        );
+    }
+    
+    public function getPostId(): string {
+        if (!empty($_POST["udid"]) && $_POST['gameVersion'] < 20 && self::$unregisteredSubmissions) {
+            $this->id = ExploitPatch::remove($_POST["udid"]);
+            if (is_numeric($this->id)) {
+                exit("-1");
+            }
+        } elseif (!empty($_POST["accountID"]) && $_POST["accountID"] != "0") {
+            $this->id = GJPCheck::getAccountIDOrDie();
+        } else {
+            exit("-1");
+        }
+
+        return $this->id;
+    }
+
+    public function getIp(): string {
+        if (isset($_SERVER['HTTP_CF_CONNECTING_IP']) && $this->isCloudflareIp($_SERVER['REMOTE_ADDR'])) {
+            return $_SERVER['HTTP_CF_CONNECTING_IP'];
+        }
+
+        if (isset($_SERVER['HTTP_X_FORWARDED_FOR']) && ipInRange::ipv4_in_range($_SERVER['REMOTE_ADDR'], '127.0.0.0/8')) {
+            return $_SERVER['HTTP_X_FORWARDED_FOR'];
+        }
+
+        return $_SERVER['REMOTE_ADDR'];
+    }
+
+    public function getIdFromName(string $userName): int {
+        $accountId = $this->db->fetchColumn(
+            "SELECT accountID FROM accounts WHERE userName LIKE ?",
+            [$userName]
+        );
+
+        return $accountId ?: 0;
+    }
+
+    public function getUserId($extId, string $userName = "Undefined"): int {
+        $register = is_numeric($extId) ? 1 : 0;
+
+        $userId = $this->db->fetchColumn(
+            "SELECT userID FROM users WHERE extID LIKE BINARY ?",
+            [$extId]
+        );
+
+        if ($userId) {
+            $this->userId = $userId;
+        } else {
+            $this->userId = $this->db->insert('users', [
+                'isRegistered' => $register,
+                'extID' => $extId,
+                'userName' => $userName,
+                'lastPlayed' => time()
+            ]);
+        }
+
+        return $this->userId;
+    }
+
+    public function getFriends(int $accountId): array {
+        if (!is_numeric($accountId)) {
+            return [];
+        }
+
+        $friendships = $this->db->fetchAll(
+            "SELECT person1, person2 FROM friendships WHERE person1 = ? OR person2 = ?",
+            [$accountId, $accountId]
+        );
+
+        if (empty($friendships)) {
+            return [];
+        }
+
+        $friends = [];
+        foreach ($friendships as $friendship) {
+            $person = ($friendship["person1"] == $accountId) 
+                ? $friendship["person2"] 
+                : $friendship["person1"];
+            
+            $friends[] = $person;
+        }
+
+        return $friends;
+    }
+
+    public function getSongString(array $song): ?string {
+        if (empty($song['ID'])) {
+            return null;
+        }
+       
+        if (!empty($song["isDisabled"]) && $song["isDisabled"] == 1) {
+            return null;
+        }
+
+        $download = $song["download"];
+        if (strpos($download, ':') !== false) {
+            $download = urlencode($download);
+        }
+        
+        return sprintf(
+            "1~|~%d~|~2~|~%s~|~3~|~%d~|~4~|~%s~|~5~|~%s~|~6~|~~|~10~|~%s~|~7~|~~|~8~|~1",
+            $song["ID"],
+            str_replace("#", "", $song["name"]),
+            $song["authorID"],
+            $song["authorName"],
+            $song["size"],
+            $download
+        );
+    }
+    
+    public function getUserString(array $userData): string {
+        $extId = is_numeric($userData['extID']) ? $userData['extID'] : 0;
+        return $userData['userID'] . ":" . $userData['userName'] . ":" . $extId;
+    }
+
+    public function isCloudflareIp(string $ip): bool {
+        $cfIps = [
+            '173.245.48.0/20',
+            '103.21.244.0/22',
+            '103.22.200.0/22',
+            '103.31.4.0/22',
+            '141.101.64.0/18',
+            '108.162.192.0/18',
+            '190.93.240.0/20',
+            '188.114.96.0/20',
+            '197.234.240.0/22',
+            '198.41.128.0/17',
+            '162.158.0.0/15',
+            '104.16.0.0/13',
+            '104.24.0.0/14',
+            '172.64.0.0/13',
+            '131.0.72.0/22'
+        ];
+
+        foreach ($cfIps as $cfIp) {
+            if (ipInRange::ipv4_in_range($ip, $cfIp)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function isFriends(int $accountId, int $targetAccountId): bool {
+        if (!is_numeric($accountId) || !is_numeric($targetAccountId)) {
+            return false;
+        }
+
+        return $this->db->exists(
+            "friendships",
+            "(person1 = ? AND person2 = ?) OR (person1 = ? AND person2 = ?)",
+            [$accountId, $targetAccountId, $targetAccountId, $accountId]
+        );
+    }
+
+    public function rateLevel(int $accountId, int $levelId, int $stars, int $difficulty, int $auto, int $demon): void {
+        if (!is_numeric($accountId)) {
+            return;
+        }
+
+        $this->db->update(
+            'levels',
+            [
+                'starDemon' => $demon,
+                'starAuto' => $auto,
+                'starDifficulty' => $difficulty,
+                'starStars' => $stars,
+                'rateDate' => time()
+            ],
+            'levelID = ?',
+            [$levelId]
+        );
+        
+        $diff = $this->getDifficulty($stars, "", "stars");
+        
+        $this->db->insert('modactions', [
+            'type' => 1,
+            'value' => $diff["name"],
+            'value2' => $stars,
+            'value3' => $levelId,
+            'timestamp' => time(),
+            'account' => $accountId
+        ]);
+    }
+
+    public function suggestLevel(int $accountId, int $levelId, int $difficulty, int $stars, int $feat, int $auto, int $demon): void {
+        if (!is_numeric($accountId)) {
+            return;
+        }
+        
+        $state = $this->getState($feat);
+        
+        $this->db->insert('sendLevel', [
+            'accountID' => $accountId,
+            'levelID' => $levelId,
+            'difficulty' => $difficulty,
+            'stars' => $stars,
+            'featured' => $state["featured"],
+            'state' => $state["epic"],
+            'auto' => $auto,
+            'demon' => $demon,
+            'timestamp' => time()
+        ]);
+    }
+
+    public function verifyCoins(int $accountId, int $levelId, int $coins): void {
+        if (!is_numeric($accountId)) {
+            return;
+        }
+
+        $this->db->update(
+            'levels',
+            ['starCoins' => $coins],
+            'levelID = ?',
+            [$levelId]
+        );
+        
+        $this->db->insert('modactions', [
+            'type' => 3,
+            'value' => $coins,
+            'value3' => $levelId,
+            'timestamp' => time(),
+            'account' => $accountId
+        ]);
+    }
+
+    public function addGauntletLevel(int $gauntlet): bool {
+        $levelsGauntlet = $this->db->fetchAll(
+            "SELECT * FROM gauntlets WHERE ID = ?",
+            [$gauntlet]
+        );
+
+        foreach ($levelsGauntlet as $level) {
+            for ($x = 1; $x <= 5; $x++) {
+                $gauntletId = $this->db->fetchColumn(
+                    "SELECT ID FROM gauntlets WHERE level{$x} = ?",
+                    [$level['level' . $x]]
+                );
+            
+                $this->updateGauntletLevel($gauntletId, $x, $level['level' . $x]);
+            }
+        }
+        
+        return true;
+    }
+
+    public function updateGauntletLevel(int $gauntletId, int $levelPos, int $level): void {
+        $this->db->update(
+            'levels',
+            [
+                'gauntletID' => $gauntletId,
+                'gauntletLevel' => $levelPos
+            ],
+            'levelID = ?',
+            [$level]
+        );
+    }
+
+    public static function formatBytes(float $bytes, int $precision = 2): float { 
+        return round(pow(1024, log($bytes, 1024) - floor(log($bytes, 1024))), $precision); 
+    }
+}

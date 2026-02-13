@@ -1,54 +1,66 @@
 <?php
-    require_once __DIR__."/Main.php";
-    
-    require_once __DIR__."/lib/Database.php";
-    require_once __DIR__."/lib/XORCipher.php";
-    require_once __DIR__."/lib/generateHash.php";
-    require_once __DIR__."/../config/dailyChests.php";
+require_once __DIR__."/Main.php";
+require_once __DIR__."/lib/Database.php";
+require_once __DIR__."/lib/XORCipher.php";
+require_once __DIR__."/lib/generateHash.php";
+require_once __DIR__."/../config/dailyChests.php";
 
-    interface ChallengesInterface {
-        public function getData(int $accountID, $udid, $check): string;
+interface ChallengesInterface {
+    public function getData(int $accountId, string $udid, string $check): string;
+}
+
+class Challenges implements ChallengesInterface {
+    private Database $db;
+    private Main $main;
+
+    public function __construct() {
+        $this->db = new Database();
+        $this->main = new Main();
     }
 
-    class Challenges implements ChallengesInterface {
-        protected $connection; 
-        protected $Main, $Database;
+    public function getData(int $accountId, string $udid, string $check): string {
+        $userId = ($accountId !== 0) ? $this->main->getUserId($accountId) : $this->main->getUserId($udid);
+        $decodedCheck = XORCipher::cipher(base64_decode(substr($check, 5)), 19847);
+        $difference = time() - strtotime('2000-12-17');
+        $questId = floor($difference / 86400);
 
-        public function __construct() {
-            $this->Database = new Database();
-            $this->Main = new Main();
- 
-            $this->connection = $this->Database->open_connection();
+        $questId = $questId * 3;
+        $quest1 = $questId;
+        $quest2 = $questId + 1;
+        $quest3 = $questId + 2;
+
+        $timeLeft = strtotime("tomorrow 00:00:00") - time();
+
+        $challenges = $this->db->fetchAll(
+            "SELECT type, amount, reward, name FROM quests"
+        );
+
+        shuffle($challenges);
+
+        if (empty($challenges[0]) || empty($challenges[1]) || empty($challenges[2])) {
+            return "-1";
         }
 
-        public function getData(int $accountID, $udid, $check): string {
-            $userID = ($accountID !== 0) ? $this->Main->get_user_id($accountID) : $this->Main->get_user_id($udid);
-            $check = XORCipher::cipher(base64_decode(substr($check, 5)), 19847);
-            $difference = time() - strtotime('2000-12-17');
-            $questID = floor($difference / 86400);
+        $quest1 = $quest1 . "," . $challenges[0]["type"] . "," . $challenges[0]["amount"] . "," . $challenges[0]["reward"] . "," . $challenges[0]["name"];
+        $quest2 = $quest2 . "," . $challenges[1]["type"] . "," . $challenges[1]["amount"] . "," . $challenges[1]["reward"] . "," . $challenges[1]["name"];
+        $quest3 = $quest3 . "," . $challenges[2]["type"] . "," . $challenges[2]["amount"] . "," . $challenges[2]["reward"] . "," . $challenges[2]["name"];
 
-            $questID = $questID * 3;
-            $quest_1 = $questID;
-            $quest_2 = $questID + 1;
-            $quest_3 = $questID + 2;
+        $dataString = sprintf(
+            "SaKuJ:%d:%s:%s:%d:%d:%s:%s:%s",
+            $userId,
+            $decodedCheck,
+            $udid,
+            $accountId,
+            $timeLeft,
+            $quest1,
+            $quest2,
+            $quest3
+        );
 
-            $timeleft = strtotime("tomorrow 00:00:00") - time();
+        $ciphered = XORCipher::cipher($dataString, 19847);
+        $encoded = base64_encode($ciphered);
+        $hash = GenerateHash::genSolo3($encoded);
 
-            $challenge = $this->connection->prepare("SELECT type, amount, reward, name FROM quests");
-            $challenge->execute();
-            $challenges = $challenge->fetchAll();
-
-            shuffle($challenges);
-
-            if (empty($challenges[0]) || empty($challenges[1]) || empty($challenges[2])) return -1;
-
-            $quest_1 = $quest_1.",".$challenges[0]["type"].",".$challenges[0]["amount"].",".$challenges[0]["reward"].",".$challenges[0]["name"]."";
-            $quest_2 = $quest_2.",".$challenges[1]["type"].",".$challenges[1]["amount"].",".$challenges[1]["reward"].",".$challenges[1]["name"]."";
-            $quest_3 = $quest_3.",".$challenges[2]["type"].",".$challenges[2]["amount"].",".$challenges[2]["reward"].",".$challenges[2]["name"]."";
-
-            $string = base64_encode(XORCipher::cipher("SaKuJ:".$userID.":".$check.":".$udid.":".$accountID.":".$timeleft.":".$quest_1.":".$quest_2.":".$quest_3."", 19847));
-            $hash = GenerateHash::genSolo3($string);
-
-            return "SaKuJ".$string."|".$hash;
-        }
+        return "SaKuJ" . $encoded . "|" . $hash;
     }
+}

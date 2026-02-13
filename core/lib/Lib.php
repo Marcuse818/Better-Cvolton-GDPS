@@ -2,105 +2,74 @@
 require_once __DIR__."/Database.php";
 
 class Lib {
-    private $db;
+    private Database $db;
 
     public function __construct() {
         $this->db = new Database();
     }
     
-    public function get_difficulty($diff, $auto, $demon) {
-        if($auto != 0) return "Auto";
-        if($demon != 0) return "Demon";
+    public function getDifficulty(int $diff, int $auto, int $demon): string {
+        if ($auto != 0) return "Auto";
+        if ($demon != 0) return "Demon";
         
-        switch($diff) {
-            case 0:
-                return "N/A";
-                
-            case 10:
-                return "Easy";
-                
-            case 20:
-                return "Normal";
-                
-            case 30:
-                return "Hard";
-                
-            case 40:
-                return "Harder";
-                
-            case 50:
-                return "Insane";
-                
-            default:
-                return "Unknown";
-        }
+        $difficulties = [
+            0 => "N/A",
+            10 => "Easy",
+            20 => "Normal",
+            30 => "Hard",
+            40 => "Harder",
+            50 => "Insane"
+        ];
+        
+        return $difficulties[$diff] ?? "Unknown";
     }
 
-    public function demon_filter($demon_rating) {
-        $rating = ["demon" => 0, "name" => "Unknown"];
-        
-        switch($demon_rating) 
-        {
-            case 1:
-                $rating["demon"] = 3;
-                $rating["name"] = "Easy";
-                break;
+    public function demonFilter(int $demonRating): array {
+        $ratings = [
+            1 => ["demon" => 3, "name" => "Easy"],
+            2 => ["demon" => 4, "name" => "Medium"],
+            3 => ["demon" => 0, "name" => "Hard"],
+            4 => ["demon" => 5, "name" => "Insane"],
+            5 => ["demon" => 6, "name" => "Extreme"]
+        ];
 
-            case 2:
-                $rating["demon"] = 4;
-                $rating["name"] = "Medium";
-                break;
-
-            case 3:
-                $rating["demon"] = 0;
-                $rating["name"] = "Hard";
-                break;
-
-            case 4:
-                $rating["demon"] = 5;
-                $rating["name"] = "Insane";
-                break;
-
-            case 5:
-                $rating["demon"] = 6;
-                $rating["name"] = "Extreme";
-                break;
-                
-            default:
-                $rating["demon"] = $demon_rating;
-                $rating["name"] = "Unknown";
-                break;
-        }
-
-        return $rating;
+        return $ratings[$demonRating] ?? ["demon" => $demonRating, "name" => "Unknown"];
     }
     
-    public function make_time($delta) {
-        $interval = time() - $delta;
+    public function makeTime(int $timestamp): string {
+        $interval = time() - $timestamp;
 
-        if ($interval < 60) return round($interval)." seconds";
-        if ($interval < 3600) return round($interval / 60)." minutes";
-        if ($interval < 86400) return round($interval / 3600)." hours";
-        if ($interval < 604800) return round($interval / 86400)." days";
-        if ($interval < 2678400) return round($interval / 604800)." weeks";
-        if ($interval < 31536000) return round($interval / 2678400)." months";
-        if ($interval > 31536000) return round($interval / 31536000)." years";
+        $units = [
+            31536000 => "years",
+            2678400 => "months",
+            604800 => "weeks",
+            86400 => "days",
+            3600 => "hours",
+            60 => "minutes",
+            1 => "seconds"
+        ];
+
+        foreach ($units as $seconds => $unit) {
+            if ($interval >= $seconds) {
+                return round($interval / $seconds) . " " . $unit;
+            }
+        }
         
         return "just now";
     }
     
-    public function getAccountName($accountID) {
-        if(!is_numeric($accountID) || $accountID <= 0) {
+    public function getAccountName(int $accountId): string {
+        if ($accountId <= 0) {
             return "-1";
         }
 
         try {
-            $userName = $this->db->fetch_one(
-                "SELECT userName FROM accounts WHERE accountID = :id",
-                [':id' => $accountID]
+            $userName = $this->db->fetchColumn(
+                "SELECT userName FROM accounts WHERE accountID = ?",
+                [$accountId]
             );
             
-            return $userName ? $userName['userName'] : "-1";
+            return $userName ?: "-1";
             
         } catch (Exception $e) {
             error_log("Error getting account name: " . $e->getMessage());
@@ -108,15 +77,15 @@ class Lib {
         }
     }
 
-    public function randomString($length = 6) {
+    public function randomString(int $length = 6): string {
         try {
-            $randomString = openssl_random_pseudo_bytes(ceil($length / 2));
+            $randomBytes = openssl_random_pseudo_bytes(ceil($length / 2));
             
-            if($randomString === false) {
+            if ($randomBytes === false) {
                 throw new RuntimeException("OpenSSL random bytes failed");
             }
             
-            return substr(bin2hex($randomString), 0, $length);
+            return substr(bin2hex($randomBytes), 0, $length);
             
         } catch (Exception $e) {
             $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -131,26 +100,26 @@ class Lib {
         }
     }
 
-    public function get_accounts_with_permission($permission) {
+    public function getAccountsWithPermission(string $permission): array {
         try {
-            $roles = $this->db->fetch_all(
-                "SELECT roleID FROM roles WHERE $permission = 1 ORDER BY priority DESC"
+            $roles = $this->db->fetchAll(
+                "SELECT roleID FROM roles WHERE {$permission} = 1 ORDER BY priority DESC"
             );
 
-            $accountlist = [];
+            $accountList = [];
 
-            foreach($roles as $role) {
-                $accounts = $this->db->fetch_all(
-                    "SELECT accountID FROM roleassign WHERE roleID = :roleID",
-                    [':roleID' => $role["roleID"]]
+            foreach ($roles as $role) {
+                $accounts = $this->db->fetchAll(
+                    "SELECT accountID FROM roleassign WHERE roleID = ?",
+                    [$role["roleID"]]
                 );
 
-                foreach($accounts as $user) {
-                    $accountlist[] = (int)$user["accountID"];
+                foreach ($accounts as $user) {
+                    $accountList[] = (int)$user["accountID"];
                 }
             }
 
-            return array_unique($accountlist);
+            return array_unique($accountList);
 
         } catch (Exception $e) {
             error_log("Error getting accounts with permission: " . $e->getMessage());
@@ -158,64 +127,64 @@ class Lib {
         }
     }
     
-    public function song_reupload($url) {
+    public function songReupload(string $url): int|string {
         require_once __DIR__ . "/../../core/lib/exploitPatch.php";
         
-        if (!filter_var($url, FILTER_VALIDATE_URL) || substr($url, 0, 4) !== "http") {
+        if (!filter_var($url, FILTER_VALIDATE_URL) || !str_starts_with($url, "http")) {
             return "-2";
         }
 
         try {
-            $song = str_replace("www.dropbox.com", "dl.dropboxusercontent.com", $url);
-            $song = str_replace(["?dl=0", "?dl=1"], "", $song);
-            $song = trim($song);
+            $song = $this->prepareSongUrl($url);
 
-            $existing_song = $this->db->fetch_one(
-                "SELECT id FROM songs WHERE download = :download",
-                [':download' => $song]
+            $existingSong = $this->db->fetchOne(
+                "SELECT ID FROM songs WHERE download = ?",
+                [$song]
             );
 
-            if ($existing_song) {
-                return $existing_song['id'];
+            if ($existingSong) {
+                return $existingSong['ID'];
             }
 
-            $info = $this->get_file_info($song);
-            if (!$info || substr($info['type'], 0, 6) !== "audio/") {
+            $info = $this->getFileInfo($song);
+            if (!$info || !str_starts_with($info['type'], "audio/")) {
                 return "-4";
             }
 
-            $name = $this->prepare_song_name($song);
-            $author = "Reupload";
+            $name = $this->prepareSongName($song);
             $size = round($info['size'] / 1024 / 1024, 2);
-            $hash = "";
+            $nextId = $this->getNextSongId();
 
-            $next_id = $this->get_next_song_id();
+            $this->db->insert('songs', [
+                'ID' => $nextId,
+                'name' => $name,
+                'authorID' => 9,
+                'authorName' => "Reupload",
+                'size' => $size,
+                'download' => $song,
+                'hash' => ""
+            ]);
 
-            $new_id = $this->db->insert(
-                "INSERT INTO songs (ID, name, authorID, authorName, size, download, hash) 
-                 VALUES (:ID, :name, '9', :author, :size, :download, :hash)",
-                [
-                    ':ID' => $next_id,
-                    ':name' => $name,
-                    ':author' => $author,
-                    ':size' => $size,
-                    ':download' => $song,
-                    ':hash' => $hash
-                ]
-            );
-
-            return $new_id ?: $next_id;
+            return $nextId;
 
         } catch (Exception $e) {
-            error_log("Error in song_reupload: " . $e->getMessage());
+            error_log("Error in songReupload: " . $e->getMessage());
             return "-3";
         }
     }
 
-    private function prepare_song_name($url) {
+    private function prepareSongUrl(string $url): string {
+        $url = str_replace("www.dropbox.com", "dl.dropboxusercontent.com", $url);
+        $url = str_replace(["?dl=0", "?dl=1"], "", $url);
+        return trim($url);
+    }
+
+    private function prepareSongName(string $url): string {
         require_once __DIR__ . "/../../core/lib/exploitPatch.php";
         
-        $name = ExploitPatch::remove(urldecode(str_replace([".mp3", ".webm", ".mp4", ".wav"], "", basename($url))));
+        $name = ExploitPatch::remove(urldecode(
+            str_replace([".mp3", ".webm", ".mp4", ".wav"], "", basename($url))
+        ));
         
         if (str_contains($name, "?rlkey=")) {
             $name = explode("?", $name)[0];
@@ -224,10 +193,10 @@ class Lib {
         $name = str_replace("_", " ", $name);
         $name = ucwords($name);
         
-        return $this->sanitize_input($name);
+        return $this->sanitizeInput($name);
     }
 
-    private function get_file_info($url) {
+    private function getFileInfo(string $url): ?array {
         $context = stream_context_create([
             'http' => [
                 'method' => 'HEAD',
@@ -239,38 +208,37 @@ class Lib {
             $headers = get_headers($url, true, $context);
             
             if (!$headers) {
-                return false;
+                return null;
             }
 
             return [
                 'size' => isset($headers['Content-Length']) ? (int)$headers['Content-Length'] : 0,
-                'type' => isset($headers['Content-Type']) ? $headers['Content-Type'] : 'unknown'
+                'type' => $headers['Content-Type'] ?? 'unknown'
             ];
         } catch (Exception $e) {
             error_log("Error getting file info: " . $e->getMessage());
-            return false;
+            return null;
         }
     }
 
-    private function get_next_song_id() {
+    private function getNextSongId(): int {
         try {
-            $max_id = $this->db->fetch_one(
-                "SELECT MAX(ID) as max_id FROM songs WHERE ID <= 10000001"
+            $maxId = $this->db->fetchColumn(
+                "SELECT MAX(ID) FROM songs WHERE ID <= 10000001"
             );
             
-            return ($max_id['max_id'] ?? 0) + 1;
+            return ($maxId ?? 0) + 1;
         } catch (Exception $e) {
             error_log("Error getting next song ID: " . $e->getMessage());
             return 1;
         }
     }
 
-
-	public function sanitize_input(string $input): string {
-        $input = trim($input);
-        $input = stripslashes($input);
-        $input = htmlspecialchars($input, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        
-        return $input;
+    public function sanitizeInput(string $input): string {
+        return htmlspecialchars(
+            stripslashes(trim($input)), 
+            ENT_QUOTES | ENT_HTML5, 
+            'UTF-8'
+        );
     }
 }
