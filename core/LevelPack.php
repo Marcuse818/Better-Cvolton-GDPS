@@ -1,63 +1,46 @@
 <?php
-require_once __DIR__ . "/Main.php";
-require_once __DIR__ . "/lib/Database.php";
-require_once __DIR__ . "/lib/generateHash.php";
+    require_once __DIR__ ."/Main.php";
 
-interface MappackInterface {
-    public function getData(int $page = 0): string;
-}
 
-class MapPacks implements MappackInterface {
-    private Database $db;
+    require_once __DIR__ ."/lib/Database.php";
+    require_once __DIR__ ."/lib/generateHash.php";
 
-    public function __construct() {
-        $this->db = new Database();
+    interface MappackInterface {
+        public function get_data(int $page = 0): string;
     }
 
-    public function getData(int $page = 0): string {
-        $offset = $page * 10;
-        $mappackString = "";
-        $levels = "";
-        $hashString = "";
+    class MapPacks implements MappackInterface {
+        private $connection;
 
-        $mapPacks = $this->db->fetchAll(
-            "SELECT colors2, rgbcolors, ID, name, levels, stars, coins, difficulty 
-             FROM mappacks 
-             ORDER BY ID ASC 
-             LIMIT 10 OFFSET ?",
-            [$offset]
-        );
-
-        foreach ($mapPacks as $mapPack) {
-            $levels .= $mapPack["ID"] . ",";
-            $color2 = $mapPack["colors2"];
-
-            if ($color2 == "none" || $color2 == "") {
-                $color2 = $mapPack['rgbcolors'];
-            }
-
-            $mappackString .= sprintf(
-                "1:%d:2:%s:3:%s:4:%d:5:%d:6:%d:7:%s:8:%s|",
-                $mapPack["ID"],
-                $mapPack["name"],
-                $mapPack["levels"],
-                $mapPack["stars"],
-                $mapPack["coins"],
-                $mapPack["difficulty"],
-                $mapPack["rgbcolors"],
-                $color2
-            );
-            
-            $hashString .= $mapPack["ID"] . $mapPack["levels"];
+        public function __construct() {
+            $database = new Database();
+            $this->connection = $database->open_connection();
         }
 
-        $totalMapPacks = $this->db->fetchColumn(
-            "SELECT COUNT(*) FROM mappacks"
-        );
+        public function get_data(int $page = 0): string {
+            $page *= 10;
 
-        $mappackString = rtrim($mappackString, "|");
-        $levels = rtrim($levels, ",");
+            $map_packs = $this->connection->prepare("SELECT colors2, rgbcolors, ID, name, levels, stars, coins, difficulty FROM `mappacks` ORDER BY `ID` ASC LIMIT 10 OFFSET $page");
+            $map_packs->execute();
+            $map_packs_result = $map_packs->fetchAll();
 
-        return $mappackString . "#" . $totalMapPacks . ":" . $page . ":10#" . GenerateHash::genPack($levels);
+            foreach ($map_packs_result as $map_pack) {
+                $levels .= $map_pack["ID"].",";
+                $color_2 = $map_pack["colors2"];
+
+                if ($color_2 == "none" || $color_2 == "") $color_2 = $map_pack['rgbcolors'];
+
+                $mappackString .= "1:".$map_pack["ID"].":2:".$map_pack["name"].":3:".$map_pack["levels"].":4:".$map_pack["stars"].":5:".$map_pack["coins"].":6:".$map_pack["difficulty"].":7:".$map_pack["rgbcolors"].":8:".$color_2."|";
+            }
+
+            $map_packs = $this->connection->prepare("SELECT count(*) FROM mappacks");
+            $map_packs->execute();
+            $total_map_packs = $map_packs->fetchColumn();
+
+            $mappackString = substr($mappackString, 0, -1);
+            $levels = substr($levels, 0, -1);
+
+            return $mappackString."#".$total_map_packs.":".$page.":10#".GenerateHash::genPack($levels);
+        }
+
     }
-}

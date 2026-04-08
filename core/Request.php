@@ -1,27 +1,28 @@
 <?php
-require_once __DIR__."/Main.php";
-require_once __DIR__."/lib/Database.php";
-
-interface RequestInterface {
-    public function request(int $accountId): int|string;
-}
-
-class Request implements RequestInterface {
-    private Main $main;
-
-    public function __construct() {
-        $this->main = new Main();
+    interface RequestInterface {
+        public function request(int $accountID): string;
     }
 
-    public function request(int $accountId): int|string {
-        $permission = $this->main->getRolePermission($accountId, "actionRequestMod");
-        
-        if ($permission < 1) {
+    class Request implements RequestInterface {
+        protected $connection;
+        protected $main, $lib;
+
+        public function __construct() {
+            $Database = new Database();
+            $this->main = new Main();
+            $this->lib = new Lib();
+
+            $this->connection = $Database->open_connection();
+        }
+
+        public function request(int $accountID): string {
+            if ($this->main->getRolePermission($accountID, "actionRequestMod") >= 1)
+            {
+                if ($this->main->getRolePermission($accountID, "modBadgeLevel") >= 3) return 3;
+                return $this->main->getRolePermission($accountID, "modBadgeLevel"); 
+            }
+
             return "-1";
         }
-        
-        $badgeLevel = $this->main->getRolePermission($accountId, "modBadgeLevel");
-        
-        return $badgeLevel >= 3 ? 3 : $badgeLevel;
     }
-}
+?>

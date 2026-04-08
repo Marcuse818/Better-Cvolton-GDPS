@@ -1,523 +1,406 @@
 <?php  
-require_once __DIR__."/Main.php";
-require_once __DIR__."/lib/Database.php";
-require_once __DIR__."/lib/Lib.php";
+    require_once __DIR__."/Main.php";
 
-interface ScoresInterface {
-    public function getData(
-        int $accountId, 
-        int $levelId, 
-        ?int $type = null, 
-        string $mode = "points", 
-        int $time = 0, 
-        int $points = 0,
-        int $count = 0
-    ): string;
-    
-    public function update(int $accountId, int $userId, string $hostname): string;
-}
+    require_once __DIR__."/lib/Database.php";
+    require_once __DIR__."/lib/Lib.php";
 
-abstract class BaseScores implements ScoresInterface {
-    protected Database $db;
-    protected Main $main;
-    protected Lib $lib;
-    protected int $uploadDate;
-
-    public function __construct() {
-        $this->main = new Main();
-        $this->db = new Database();
-        $this->lib = new Lib();
-        $this->uploadDate = time();
+    interface Scores {
+        public function getData(
+            $accountID, 
+            int $levelID, 
+            $type = null, 
+            $mode = "points", 
+            int $time = 0, 
+            int $points = 0,
+            int $count = 0
+        ): string;
+        public function update(int $accountID, int $userID, string $hostname): string;
     }
 
-    abstract public function getData(int $accountId, int $levelId, ?int $type = null, string $mode = "points", int $time = 0, int $points = 0, int $count = 0): string;
-    
-    abstract public function update(int $accountId, int $userId, string $hostname): string;
+    class Creators implements Scores {
+        protected $connection;
+        protected $Main, $Database, $Lib;
 
-    protected function buildUserString(array $user, int $rank, array $extra = []): string {
-        $extId = is_numeric($user["extID"]) ? $user["extID"] : 0;
-        
-        $fields = [
-            1 => $user["userName"],
-            2 => $user["userID"],
-            13 => $user["coins"] ?? 0,
-            17 => $user["userCoins"] ?? 0,
-            6 => $rank,
-            9 => $user["icon"],
-            10 => $user["color1"],
-            11 => $user["color2"],
-            51 => $user["color3"] ?? 0,
-            14 => $user["iconType"],
-            15 => $user["special"],
-            16 => $extId,
-            3 => $user["stars"] ?? 0,
-            8 => round($user["creatorPoints"] ?? 0, 0, PHP_ROUND_HALF_DOWN),
-            4 => $user["demons"] ?? 0,
-            7 => $extId,
-            46 => $user["diamonds"] ?? 0,
-            52 => $user["moons"] ?? 0
-        ];
+        private $uploadDate;
 
-        foreach ($extra as $key => $value) {
-            $fields[$key] = $value;
+        public function __construct() {
+            $this->Main = new Main();
+            $this->Database = new Database();
+            $this->Lib = new Lib();
+
+            $this->connection = $this->Database->open_connection();
+            $this->uploadDate = time();
+        }
+        public function getData($accountID, int $levelID, $type = null, $mode = "points", int $time = 0, int $points = 0, int $count = 0): string {
+            $creators = $this->connection->prepare("SELECT * FROM users WHERE isCreatorBanned = '0' ORDER BY creatorPoints DESC LIMIT 100");
+            $creators->execute();
+            $creators = $creators->fetchAll();
+            $xi = 0;
+
+            foreach($creators as &$creator) {
+                $extID = (is_numeric($creator["extID"])) ? $creator["extID"] : 0;
+                $xi++;
+
+                $creatorsString .= "1:".$creator["userName"].":2:".$creator["userID"].":13:".$creator["coins"].":17:".$creator["userCoins"].":6:".$xi.":9:".$creator["icon"].":10:".$creator["color1"].":11:".$creator["color2"].":14:".$creator["iconType"].":15:".$creator["special"].":16:".$extID.":3:".$creator["stars"].":8:".round($creator["creatorPoints"], 0, PHP_ROUND_HALF_DOWN).":4:".$creator["demons"].":7:".$extID.":46:".$creator["diamonds"]."|";
+            }
+
+            $creatorsString = substr($creatorsString, 0, -1);
+
+            return $creatorsString;
         }
 
-        $parts = [];
-        foreach ($fields as $key => $value) {
-            $parts[] = "$key:$value";
-        }
-
-        return implode(":", $parts) . "|";
-    }
-}
-
-class Creators extends BaseScores {
-    public function getData(int $accountId, int $levelId, ?int $type = null, string $mode = "points", int $time = 0, int $points = 0, int $count = 0): string {
-        $creators = $this->db->fetchAll(
-            "SELECT * FROM users WHERE isCreatorBanned = '0' ORDER BY creatorPoints DESC LIMIT 100"
-        );
-
-        $rank = 0;
-        $creatorsString = "";
-
-        foreach ($creators as $creator) {
-            $rank++;
-            $creatorsString .= $this->buildUserString($creator, $rank);
-        }
-
-        return rtrim($creatorsString, "|");
+        public function update(int $accountID, int $userID, string $hostname): string { return "lol"; }
     }
 
-    public function update(int $accountId, int $userId, string $hostname): string {
-        return "lol";
-    }
-}
+    class Score implements Scores {
+        protected $connection;
+        protected $Main, $Database, $Lib;
 
-class Score extends BaseScores {
-    public int $percent = 0;
-    public int $attempts = 0;
-    public int $clicks = 0;
-    public int $progresses = 0;
-    public int $dailyId = 0;
-    public int $time = 0;
-    public int $coins = 0;
-    public int $stars = 0;
-    public int $demons = 0;
-    public int $icon = 0;
-    public int $color1 = 0;
-    public int $color2 = 0;
-    public int $gameVersion = 0;
-    public int $binaryVersion = 0;
-    public int $iconType = 0;
-    public int $userCoins = 0;
-    public int $special = 0;
-    public int $accIcon = 0;
-    public int $accShip = 0;
-    public int $accBall = 0;
-    public int $accBird = 0;
-    public int $accDart = 0;
-    public int $accRobot = 0;
-    public int $accGlow = 0;
-    public int $accSpider = 0;
-    public int $accExplosion = 0;
-    public int $diamonds = 0;
-    public int $moons = 0;
-    public int $color3 = 0;
-    public int $accSwing = 0;
-    public int $accJetpack = 0;
-    public string $userName = "";
-    public string $secret = "";
+        private $uploadDate;
+        public $userName;
+        public $percent, $attempts, $clicks, $progresses, $dailyID, $time;
+        public $secret;				
+		public $stars; 				
+		public $demons; 				
+		public $icon; 				
+		public $color1; 				
+		public $color2;				
 
-    public function getData(int $accountId, int $levelId, ?int $type = null, string $mode = "points", int $time = 0, int $points = 0, int $count = 0): string {
-        $condition = ($this->dailyId > 0) ? ">" : "=";
+		public $gameVersion;		
+		public $binaryVersion;	
+		public $coins; 				
+		public $iconType;			
+		public $userCoins;			
+		public $special;			
+		public $accIcon;			
+		public $accShip;			
+		public $accBall;			
+		public $accBird;			
+		public $accDart;			
+		public $accRobot;			
+		public $accGlow;			
+		public $accSpider;				
+        public $accExplosion;		
+		public $diamonds;			
+		public $moons;			
+		public $color3;			
+		public $accSwing;			
+		public $accJetpack;		
 
-        $oldPercent = $this->db->fetchColumn(
-            "SELECT percent FROM levelscores WHERE accountID = ? AND levelID = ? AND dailyID $condition 0",
-            [$accountId, $levelId]
-        );
-        
-        $data = [
-            'accountID' => $accountId,
-            'levelID' => $levelId,
-            'percent' => $this->percent,
-            'uploadDate' => $this->uploadDate,
-            'coins' => $this->coins,
-            'attempts' => $this->attempts,
-            'clicks' => $this->clicks,
-            'time' => $this->time,
-            'progresses' => $this->progresses,
-            'dailyID' => $this->dailyId
-        ];
+        public function __construct() {
+            $this->Main = new Main();
+            $this->Database = new Database();
+            $this->Lib = new Lib();
 
-        if ($oldPercent === null) {
-            $this->db->insert('levelscores', $data);
-        } elseif ($oldPercent <= $this->percent) {
-            $this->db->update(
-                'levelscores',
-                $data,
-                'accountID = ? AND levelID = ? AND dailyID ' . $condition . ' 0',
-                [$accountId, $levelId]
-            );
+            $this->connection = $this->Database->open_connection();
+            $this->uploadDate = time();
         }
 
-        if ($this->percent > 100) {
-            $this->db->update(
-                'users',
-                ['isBanned' => 1],
-                'extID = ?',
-                [$accountId]
-            );
-        }
+        public function getData($accountID, int $levelID, $type = null, $mode = "points", int $time = 0, int $points = 0, int $count = 0): string {
+            // wtf in code this wasn't used later ??? $userID = $this->Main->get_user_id($accountID);
+            $condition = ($this->dailyID > 0) ? ">" : "=";
 
-        $scores = $this->getScoresByType($type, $accountId, $levelId, $condition);
-        
-        return $this->buildScoreString($scores);
-    }
+            $level_score = $this->connection->prepare("SELECT percent FROM levelscores WHERE accountID = :accountID AND levelID = :levelID AND dailyID $condition 0");
+            $level_score->execute([":accoundID" => $accountID, ":levelID" => $levelID]);
+            $old_percent = $level_score->fetchColumn();
+            
+            $level_score = ($level_score->rowCount() == 0) ?
+                $this->connection->prepare("INSERT INTO levelscores (accountID, levelID, percent, uploadDate, coins, attempts, clicks, time, progresses, dailyID) VALUES (:accountID, :levelID, :percent, :uploadDate, :coins, :attempts, :clicks, :time, :progresses, :dailyID)") :
+                (($old_percent <= $this->percent) ? 
+                    $this->connection->prepare("UPDATE levelscores SET percent = :percent, uploadDate = :uploadDate, coins = :coins, attempts = :attempts, clicks = :clicks, time = :time, progresses = :progresses, dailyID = :dailyID WHERE accountID = :accountID AND levelID = :levelID AND dailyID $condition 0") :
+                    $this->connection->prepare("SELECT count(*) FROM levelscores WHERE percent=:percent AND uploadDate=:uploadDate AND accountID=:accountID AND levelID=:levelID AND coins = :coins AND attempts = :attempts AND clicks = :clicks AND time = :time AND progresses = :progresses AND dailyID = :dailyID"));
+            
+            $level_score->execute([':accountID' => $accountID, ':levelID' => $levelID, ':percent' => $this->percent, ':uploadDate' => $this->uploadDate, ':coins' => $this->coins, ':attempts' => $this->attempts, ':clicks' => $this->clicks, ':time' => $this->time, ':progresses' => $this->progresses, ':dailyID' => $this->dailyID]);
+            
+            if ($this->percent > 100) 
+            {
+                $banned = $this->connection->prepare("UPDATE users SET isBanned = 1 WHERE extID = :accountID");
+                $banned->execute([":accountID" => $accountID]);
+            }
 
-    private function getScoresByType(?int $type, int $accountId, int $levelId, string $condition): array {
-        switch ($type) {
-            case 0:
-                $friends = $this->main->getFriends($accountId);
-                $friends[] = $accountId;
-                $friendsList = implode(",", $friends);
+            switch($type) {
+                case 0:
+                    $friends = $this->Main->get_friends($accountID);
+                    $friends[] = $accountID;
+                    $friends = implode(",", $friends);
+                    $type_result = $this->connection->prepare("SELECT accountID, uploadDate, percent, coins FROM levelscores WHERE dailyID $condition 0 AND levelID = :levelID AND accountID IN ($friends) ORDER BY percent DESC");
+                    $type_result->execute([":levelID"=> $levelID]);
+                    break;
                 
-                return $this->db->fetchAll(
-                    "SELECT accountID, uploadDate, percent, coins FROM levelscores 
-                     WHERE dailyID $condition 0 AND levelID = ? AND accountID IN ($friendsList) 
-                     ORDER BY percent DESC",
-                    [$levelId]
-                );
-            
-            case 1:
-                return $this->db->fetchAll(
-                    "SELECT accountID, uploadDate, percent, coins FROM levelscores 
-                     WHERE dailyID $condition 0 AND levelID = ? 
-                     ORDER BY percent DESC",
-                    [$levelId]
-                );
+                case 1:
+                    $type_result = $this->connection->prepare("SELECT accountID, uploadDate, percent, coins FROM levelscores WHERE dailyID $condition 0 AND levelID = :levelID ORDER BY percent DESC");
+                    $type_result->execute([":levelID" => $levelID]);
+                    break;
 
-            case 2:
-                return $this->db->fetchAll(
-                    "SELECT accountID, uploadDate, percent, coins FROM levelscores 
-                     WHERE dailyID $condition 0 AND levelID = ? AND uploadDate > ? 
-                     ORDER BY percent DESC",
-                    [$levelId, time() - 604800]
-                );
+                case 2:
+                    $type_result = $this->connection->prepare("SELECT accountID, uploadDate, percent, coins FROM levelscores WHERE dailyID $condition 0 AND levelID = :levelID AND uploadDate > :time ORDER BY percent DESC");
+                    $type_result->execute([":levelID", ":time" => time() - 604800]);
+                    break;
 
-            default:
-                return [];
-        }
-    }
+                default:
+                    return -1;
+            } 
 
-    private function buildScoreString(array $scores): string {
-        $scoreString = "";
+            $type_result = $type_result->fetchAll();
 
-        foreach ($scores as $score) {
-            $user = $this->db->fetchOne(
-                "SELECT userName, userID, icon, color1, color2, color3, iconType, special, extID, isBanned 
-                 FROM users WHERE extID = ?",
-                [$score["accountID"]]
-            );
-            
-            if (!$user || $user["isBanned"] != 0) {
-                continue;
+            foreach($type_result as &$score) {
+                $extID = $score["accountID"];
+                $level_score = $this->connection->prepare("SELECT userName, userID, icon, color1, color2, color3, iconType, special, extID, isBanned FROM users WHERE extID = :extID");
+                $level_score->execute([":extID" => $extID]);
+                $users = $level_score->fetchAll();
+                $user = $users[0];
+                $time = $this->Lib->make_time($score["uploadDate"]);
+                
+                if ($user["isBanned"] == 0)
+                {
+                    $place = ($score["percent"]) ? 1 : (($score["percent"] > 75) ? 2 : 3);
+                }
+
+                $scoreString .= "1:".$user["userName"].":2:".$user["userID"].":9:".$user["icon"].":10:".$user["color1"].":11:".$user["color2"].":51:".$user["color3"].":14:".$user["iconType"].":15:".$user["special"].":16:".$user["extID"].":3:".$score["percent"].":6:".$place.":13:".$score["coins"].":42:".$this->time."|";
             }
 
-            $place = ($score["percent"] == 100) ? 1 : (($score["percent"] > 75) ? 2 : 3);
-            $time = $this->lib->makeTime($score["uploadDate"]);
-            
-            $extra = [
-                3 => $score["percent"],
-                6 => $place,
-                13 => $score["coins"],
-                42 => $this->time
-            ];
-            
-            $scoreString .= $this->buildUserString($user, $place, $extra);
+            return $scoreString;
         }
 
-        return rtrim($scoreString, "|") ?: "-1";
-    }
+        public function update(int $accountID, int $userID, string $hostname): string {
+            $update = $this->connection->prepare("SELECT stars, coins, demons, userCoins, diamonds, moons FROM users WHERE userID = :userID LIMIT 1");
+            $update->execute([":userID" => $userID]);
+            $old = $update->fetch();
 
-    public function update(int $accountId, int $userId, string $hostname): string {
-        $old = $this->db->fetchOne(
-            "SELECT stars, coins, demons, userCoins, diamonds, moons FROM users WHERE userID = ? LIMIT 1",
-            [$userId]
-        );
-
-        $userData = [
-            'gameVersion' => $this->gameVersion,
-            'userName' => $this->userName,
-            'coins' => $this->coins,
-            'secret' => $this->secret,
-            'stars' => $this->stars,
-            'demons' => $this->demons,
-            'icon' => $this->icon,
-            'color1' => $this->color1,
-            'color2' => $this->color2,
-            'iconType' => $this->iconType,
-            'userCoins' => $this->userCoins,
-            'special' => $this->special,
-            'accIcon' => $this->accIcon,
-            'accShip' => $this->accShip,
-            'accBall' => $this->accBall,
-            'accBird' => $this->accBird,
-            'accDart' => $this->accDart,
-            'accRobot' => $this->accRobot,
-            'accGlow' => $this->accGlow,
-            'IP' => $hostname,
-            'lastPlayed' => $this->uploadDate,
-            'accSpider' => $this->accSpider,
-            'accExplosion' => $this->accExplosion,
-            'diamonds' => $this->diamonds,
-            'moons' => $this->moons,
-            'color3' => $this->color3,
-            'accSwing' => $this->accSwing,
-            'accJetpack' => $this->accJetpack
-        ];
-
-        $this->db->update('users', $userData, 'userID = ?', [$userId]);
-
-        $diffs = [
-            'stars' => $this->stars - ($old['stars'] ?? 0),
-            'coins' => $this->coins - ($old['coins'] ?? 0),
-            'demons' => $this->demons - ($old['demons'] ?? 0),
-            'userCoins' => $this->userCoins - ($old['userCoins'] ?? 0),
-            'diamonds' => $this->diamonds - ($old['diamonds'] ?? 0),
-            'moons' => $this->moons - ($old['moons'] ?? 0)
-        ];
-
-        $this->db->insert('actions', [
-            'type' => 9,
-            'value' => $diffs['stars'],
-            'timestamp' => time(),
-            'account' => $userId,
-            'value2' => $diffs['coins'],
-            'value3' => $diffs['demons'],
-            'value4' => $diffs['userCoins'],
-            'value5' => $diffs['diamonds'],
-            'value6' => $diffs['moons']
-        ]);
-
-        return (string)$userId;
-    }
-}
-
-class Platformer extends BaseScores {
-    public int $time = 0;
-    public int $points = 0;
-
-    public function getData(int $accountId, int $levelId, ?int $type = null, string $mode = "points", int $time = 0, int $points = 0, int $count = 0): string {
-        $oldValue = $this->db->fetchColumn(
-            "SELECT {$mode} FROM platscores WHERE accountID = ? AND levelID = ?",
-            [$accountId, $levelId]
-        );
-        
-        $scoreData = [
-            'accountID' => $accountId,
-            'levelID' => $levelId,
-            $mode => ($mode == "time" ? $this->time : $this->points),
-            'timestamp' => $this->uploadDate
-        ];
-
-        if ($oldValue === null) {
-            $this->db->insert('platscores', $scoreData);
-        } else {
-            $shouldUpdate = ($mode == "time" && $oldValue > $this->time && $this->time > 0) 
-                         || ($mode == "points" && $oldValue < $this->points && $this->points > 0);
+            $update = $this->connection->prepare("UPDATE users SET gameVersion=:gameVersion, userName=:userName, coins=:coins,  secret=:secret, stars = :stars, demons = :demons, icon = :icon, color1 = :color1, color2 = :color2, iconType = :iconType, userCoins = :userCoins, special = :special, accIcon = :accIcon, accShip = :accShip, accBall = :accBall, accBird = :accBird, accDart = :accDart, accRobot = :accRobot, accGlow = :accGlow, IP = :hostname, lastPlayed = :uploadDate, accSpider = :accSpider, accExplosion=:accExplosion, diamonds=:diamonds, moons=:moons, color3=:color3, accSwing = :accSwing, accJetpack = :accJetpack WHERE userID = :userID");
+            $update->execute([':gameVersion' => $this->gameVersion, ':userName' => $this->userName, ':coins' => $this->coins, ':secret' => $this->secret, ':stars' => $this->stars, ':demons' => $this->demons, ':icon' => $this->icon, ':color1' => $this->color1, ':color2' => $this->color2, ':iconType' => $this->iconType, ':userCoins' => $this->userCoins, ':special' => $this->special, ':accIcon' => $this->accIcon, ':accShip' => $this->accShip, ':accBall' => $this->accBall, ':accBird' => $this->accBird, ':accDart' => $this->accDart, ':accRobot' => $this->accRobot, ':accGlow' => $this->accGlow, ':hostname' => $hostname, ':uploadDate' => $this->uploadDate, ':userID' => $userID, ':accSpider' => $this->accSpider, ':accExplosion' => $this->accExplosion, ':diamonds' => $this->diamonds, ':moons' => $this->moons, ':color3' => $this->color3, ':accSwing' => $this->accSwing, ':accJetpack' => $this->accJetpack]);
             
-            if ($shouldUpdate) {
-                $this->db->update(
-                    'platscores',
-                    [$mode => $scoreData[$mode], 'timestamp' => $this->uploadDate],
-                    'accountID = ? AND levelID = ?',
-                    [$accountId, $levelId]
-                );
+            $starsdiff = $this->stars - $old["stars"];
+            $coindiff = $this->coins - $old["coins"];
+            $demondiff = $this->demons - $old["demons"];
+            $ucdiff = $this->userCoins - $old["userCoins"];
+            $diadiff = $this->diamonds - $old["diamonds"];
+            $moondiff = $this->moons - $old["moons"];
+
+            $update = $this->connection->prepare("INSERT INTO actions (type, value, timestamp, account, value2, value3, value4, value5, value6) VALUES ('9', :stars, :timestamp, :account, :coinsd, :demon, :usrco, :diamond, :moons)");
+            $update->execute([':timestamp' => time(), ':stars' => $starsdiff, ':account' => $userID, ':coinsd' => $coindiff, ':demon' => $demondiff, ':usrco' => $ucdiff, ':diamond' => $diadiff, ':moons' => $moondiff]);
+
+            return $userID;
+        }
+    }
+
+    class Platformer implements Scores {
+        protected $connection;
+        protected $Main, $Database, $Lib;
+
+        private $uploadDate;
+
+        public function __construct() {
+            $this->Main = new Main();
+            $this->Database = new Database();
+            $this->Lib = new Lib();
+
+            $this->connection = $this->Database->open_connection();
+            $this->uploadDate = time();
+        }
+
+        public function getData($accountID, int $levelID, $type = null, $mode = "points", int $time = 0, int $points = 0, int $count = 0): string {
+            $plat_scores["time"] = $time;
+            $plat_scores["points"] = $points;
+            
+            $query = $this->connection->prepare("SELECT {$mode} FROM platscores WHERE accountID = :accountID AND levelID = :levelID");
+            $query->execute([':accountID' => $accountID, ':levelID' => $levelID]);
+            $old_percent = $query->fetchColumn();
+            
+            if ($query->rowCount() == 0) 
+            {
+                $query = $this->connection->prepare("INSERT INTO platscores (accountID, levelID, {$mode}, timestamp) VALUES (:accountID, :levelID, :{$mode}, :timestamp)");       
             }
-        }
-
-        $scores = $this->getPlatformerScoresByType($type, $accountId, $levelId, $mode);
-        
-        return $this->buildPlatformerString($scores, $mode);
-    }
-
-    private function getPlatformerScoresByType(?int $type, int $accountId, int $levelId, string $mode): array {
-        switch ($type) {
-            case 0:
-                $friends = $this->main->getFriends($accountId);
-                $friends[] = $accountId;
-                $friendsList = implode(",", $friends);
-
-                return $this->db->fetchAll(
-                    "SELECT * FROM platscores WHERE levelID = ? AND accountID IN ($friendsList) ORDER BY {$mode} DESC",
-                    [$levelId]
-                );
+            else
+            {
+                if(($mode == "time" && $old_percent > $plat_scores['time'] && $plat_scores['time'] > 0) || ($mode == "points" && $old_percent < $plat_scores['points'] && $plat_scores['points'] > 0)) 
+                {
+		            $query = $this->connection->prepare("UPDATE platscores SET {$mode}=:{$mode}, timestamp=:timestamp WHERE accountID=:accountID AND levelID=:levelID");
+	            } 
+	            else 
+	            {
+		            $query = $this->connection->prepare("SELECT count(*) FROM platscores WHERE {$mode} = :{$mode} AND timestamp = :timestamp AND accountID=:accountID AND levelID=:levelID");
+	            }
+            }
             
-            case 1:
-                return $this->db->fetchAll(
-                    "SELECT * FROM platscores WHERE levelID = ? ORDER BY {$mode} DESC",
-                    [$levelId]
-                );
+            $query->execute([':accountID' => $accountID, ':levelID' => $levelID, ":{$mode}" => $plat_scores[$mode], ':timestamp' => $this->uploadDate]);
+        
+            switch ($type)
+            {
+                case 0:
+		            $friends = $this->Main->get_friends($accountID);
+		            $friends[] = $accountID;
+		            $friends = implode(",", $friends);
 
-            case 2:
-                return $this->db->fetchAll(
-                    "SELECT * FROM platscores WHERE levelID = ? AND timestamp > ? ORDER BY {$mode} DESC",
-                    [$levelId, $this->uploadDate - 604800]
-                );
-
-            default:
-                return [];
-        }
-    }
-
-    private function buildPlatformerString(array $scores, string $mode): string {
-        $rank = 0;
-        $levelString = "";
-
-        foreach ($scores as $score) {
-            $user = $this->db->fetchOne(
-                "SELECT userName, userID, icon, color1, color2, color3, iconType, special, extID, isBanned 
-                 FROM users WHERE extID = ?",
-                [$score["accountID"]]
-            );
-
-            if (!$user || $user["isBanned"] != 0) {
-                continue;
+		            $query = $this->connection->prepare("SELECT * FROM platscores WHERE levelID = :levelID AND accountID IN ($friends) ORDER BY {$mode} DESC");
+		            $query_args = [':levelID' => $levelID];
+		            break;
+	            
+	            case 1:
+		            $query = $this->connection->prepare("SELECT * FROM platscores WHERE levelID = :levelID ORDER BY {$mode} DESC");
+		            $query_args = [':levelID' => $levelID];
+		            break;
+	            
+	            case 2:
+		            $query = $this->connection->prepare("SELECT * FROM platscores WHERE levelID = :levelID AND timestamp > :time ORDER BY {$mode} DESC");
+		            $query_args = [':levelID' => $levelID, ':time' => $this->uploadDate - 604800];
+		            break;
+	            
+	            default:
+		            return -1;
             }
 
-            $rank++;
-            $time = $this->lib->makeTime($score["timestamp"]);
-            $scoreValue = $score[$mode];
+            $query->execute($query_args);
+            $result = $query->fetchAll();
 
-            $fields = [
-                1 => $user['userName'],
-                2 => $user['userID'],
-                9 => $user['icon'],
-                10 => $user['color1'],
-                11 => $user['color2'],
-                14 => $user['iconType'],
-                15 => $user['color3'],
-                16 => $score["accountID"],
-                3 => $scoreValue,
-                6 => $rank,
-                42 => $time
-            ];
+            $x = 0;
 
-            $parts = [];
-            foreach ($fields as $key => $value) {
-                $parts[] = "$key:$value";
+            foreach ($result as &$score)
+            {
+                $ext_id = $score["accountID"];
+                $query = $this->connection->prepare("SELECT userName, userID, icon, color1, color2, color3, iconType, special, extID, isBanned FROM users WHERE extID = :extID");
+                $query->execute([":extID" => $ext_id]);
+                $user = $query->fetchAll();
+                $user = $user[0];
+
+                if ($user["isBanned"] != 0) continue;
+
+                $x++;
+
+                $time = $this->Lib->make_time($score["timestamp"]);
+                $score_mode = $score[$mode];
+                $levelString .= "1:{$user['userName']}:2:{$user['userID']}:9:{$user['icon']}:10:{$user['color1']}:11:{$user['color2']}:14:{$user['iconType']}:15:{$user['color3']}:16:{$ext_id}:3:{$score_mode}:6:{$x}:42:{$time}|";
             }
 
-            $levelString .= implode(":", $parts) . "|";
+            $levelString = substr($levelString, 0, -1);
+
+            return $levelString;
         }
 
-        return rtrim($levelString, "|") ?: "-1";
+        public function update(int $accountID, int $userID, string $hostname): string { return "lol"; }
     }
 
-    public function update(int $accountId, int $userId, string $hostname): string {
-        return "lol";
-    }
-}
+    class Leaderboard implements Scores {
+        protected $connection;
+        protected $Main, $Database, $Lib;
 
-class Leaderboard extends BaseScores {
-    public int $gameVersion = 0;
+        private $uploadDate;
+        public $gameVersion;
 
-    public function getData(int $accountId, int $levelId, ?int $type = null, string $mode = "points", int $time = 0, int $points = 0, int $count = 0): string {
-        $sign = empty($this->gameVersion) ? "< 20 AND gameVersion <> 0" : "> 19";
-        $rank = 0;
-        $leaderboardString = "";
+        public function __construct() {
+            $this->Main = new Main();
+            $this->Database = new Database();
+            $this->Lib = new Lib();
+
+            $this->connection = $this->Database->open_connection();
+            $this->uploadDate = time();
+        }
+
         
-        $users = match($type) {
-            "top" => $this->getTopUsers($sign),
-            "creators" => $this->getCreators(),
-            "relative" => $this->getRelativeUsers($accountId, $sign, $count, $rank),
-            "friends" => $this->getFriendsUsers($accountId),
-            default => []
-        };
+        public function getData($accountID, int $levelID, $type = null, $mode = "points", int $time = 0, int $points = 0, int $count = 0): string {
+            $sign = (empty($this->gameVersion)) ? "< 20 AND gameVersion <> 0" : "> 19";
+            $leaderboardString = "";
+            $xi = 0;
+            
+            if ($type == "top" || $type == "creators" || $type == "relative")
+            {
+                switch($type) {
+                    case "top":
+                        $leaderboard = $this->connection->prepare("SELECT * FROM users WHERE isBanned = '0' AND gameVersion $sign AND stars > 0 ORDER BY stars DESC LIMIT 100");
+                        $leaderboard->execute();
+                        break;
+                
+                    case "creators":
+                        $leaderboard = $this->connection->prepare("SELECT * FROM users WHERE isCreatorBanned = '0' AND creatorPoints > 0 ORDER BY creatorPoints DESC LIMIT 100");
+                        $leaderboard->execute();
+                        break;
 
-        if (empty($users)) {
-            return "-1";
+                    case "relative":
+                        $leaderboard = $this->connection->prepare("SELECT * FROM users WHERE extID = :accountID");
+                        $leaderboard->execute([":accountID" => $accountID]);
+                        $leaderboard = $leaderboard->fetchAll();
+                        $user = $leaderboard[0];
+                        $stars = $user["stars"];
+                        $count = (isset($count)) ? $count : 50;
+                        $count = floor($count / 2);
+                        $leaderboard = $this->connection->prepare("SELECT	A.* FROM	(
+                            (
+                                SELECT	*	FROM users
+                                WHERE stars <= :stars
+                                AND isBanned = 0
+                                AND gameVersion $sign
+                                ORDER BY stars DESC
+                                LIMIT $count
+                            )
+                            UNION
+                            (
+                                SELECT * FROM users
+                                WHERE stars >= :stars
+                                AND isBanned = 0
+                                AND gameVersion $sign
+                                ORDER BY stars ASC
+                                LIMIT $count
+                            )
+                        ) as A
+                        ORDER BY A.stars DESC");
+                        $leaderboard->execute([":stars" => $stars]);
+                        break;
+                }
+            
+                $leaderboard_result = $leaderboard->fetchAll();
+            
+                if ($type == "relative")
+                {
+                    $user = $leaderboard_result[0];
+                    $extID = $user["extID"];
+                    $leaderboard = $this->connection->prepare("SET @rownum := 0;");
+                    $leaderboard->execute();
+                    $leaderboard = $this->connection->prepare("SELECT rank, stars FROM (
+                        SELECT @rownum := @rownum + 1 AS rank, stars, extID, isBanned
+                        FROM users WHERE isBanned = '0' AND gameVersion $sign ORDER BY stars DESC
+                        ) as result WHERE extID = :extID");
+                    $leaderboard->execute([":extID" => $extID]);
+                    $leaderboard = $leaderboard->fetchAll();
+                    $leaderboard = $leaderboard[0];
+                    $xi = $leaderboard["rank"] - 1;
+                }
+                
+                foreach($leaderboard_result as &$user) {
+                    $extID = (is_numeric($user["extID"])) ? $user["extID"] : 0;
+                    $xi++;
+                    $leaderboardString .= "1:".$user["userName"].":2:".$user["userID"].":13:".$user["coins"].":17:".$user["userCoins"].":6:".$xi.":9:".$user["icon"].":10:".$user["color1"].":11:".$user["color2"].":51:".$user["color3"].":14:".$user["iconType"].":15:".$user["special"].":16:".$extID.":3:".$user["stars"].":8:".round($user["creatorPoints"], 0, PHP_ROUND_HALF_DOWN).":4:".$user["demons"].":7:".$extID.":46:".$user["diamonds"].":52:".$user["moons"]."|";
+                }
+            }
+
+            if ($type == "friends") {
+                $leaderboard = $this->connection->prepare("SELECT * FROM friendships WHERE person1 = :accountID OR person2 = :accountID");
+                $leaderboard->execute([":accountID" => $accountID]);
+                $leaderboard_result = $leaderboard->fetchAll();
+                $users = "";
+
+                foreach($leaderboard_result as &$friendship) {
+                    $person = $friendship["person1"];
+                    if ($person == $accountID) $person = $friendship["person2"];
+                    $users .= ",".$person;
+                }
+
+                $leaderboard = $this->connection->prepare("SELECT * FROM users WHERE extID IN (:accountID $users) ORDER BY stars DESC");
+                $leaderboard->execute([":accountID" => $accountID]);
+                $leaderboard_result = $leaderboard->fetchAll();
+
+                foreach($leaderboard_result as &$user) {
+                    $extID = (is_numeric($user["extID"])) ? $user["extID"] : 0;
+                    $xi++;
+                    $leaderboardString .= "1:".$user["userName"].":2:".$user["userID"].":13:".$user["coins"].":17:".$user["userCoins"].":6:".$xi.":9:".$user["icon"].":10:".$user["color1"].":11:".$user["color2"].":14:".$user["iconType"].":15:".$user["special"].":16:".$extID.":3:".$user["stars"].":8:".round($user["creatorPoints"], 0, PHP_ROUND_HALF_DOWN).":4:".$user["demons"].":7:".$extID.":46:".$user["diamonds"]."|";
+                }
+            }
+
+            if ($leaderboardString == "") return -1;
+
+            $leaderboardString = substr($leaderboardString, 0, -1);
+
+            return $leaderboardString;
         }
 
-        foreach ($users as $user) {
-            $rank++;
-            $leaderboardString .= $this->buildUserString($user, $rank);
-        }
-
-        return rtrim($leaderboardString, "|");
+        public function update(int $accountID, int $userID, string $hostname): string { return "lol"; }
     }
-
-    private function getTopUsers(string $sign): array {
-        return $this->db->fetchAll(
-            "SELECT * FROM users WHERE isBanned = '0' AND gameVersion $sign AND stars > 0 ORDER BY stars DESC LIMIT 100"
-        );
-    }
-
-    private function getCreators(): array {
-        return $this->db->fetchAll(
-            "SELECT * FROM users WHERE isCreatorBanned = '0' AND creatorPoints > 0 ORDER BY creatorPoints DESC LIMIT 100"
-        );
-    }
-
-    private function getRelativeUsers(int $accountId, string $sign, int $count, int &$rank): array {
-        $user = $this->db->fetchOne(
-            "SELECT * FROM users WHERE extID = ?",
-            [$accountId]
-        );
-
-        if (!$user) {
-            return [];
-        }
-
-        $stars = $user["stars"];
-        $halfCount = max(1, floor($count / 2));
-
-        $users = $this->db->fetchAll(
-            "SELECT A.* FROM (
-                (SELECT * FROM users WHERE stars <= ? AND isBanned = 0 AND gameVersion $sign ORDER BY stars DESC LIMIT $halfCount)
-                UNION
-                (SELECT * FROM users WHERE stars >= ? AND isBanned = 0 AND gameVersion $sign ORDER BY stars ASC LIMIT $halfCount)
-            ) as A ORDER BY A.stars DESC",
-            [$stars, $stars]
-        );
-
-        $userRank = $this->db->fetchColumn(
-            "SELECT rank FROM (
-                SELECT @rownum := @rownum + 1 AS rank, extID
-                FROM users WHERE isBanned = '0' AND gameVersion $sign ORDER BY stars DESC
-            ) as result WHERE extID = ?",
-            [$accountId]
-        );
-
-        $rank = ($userRank ?: 1) - 1;
-
-        return $users;
-    }
-
-    private function getFriendsUsers(int $accountId): array {
-        $friendships = $this->db->fetchAll(
-            "SELECT person1, person2 FROM friendships WHERE person1 = ? OR person2 = ?",
-            [$accountId, $accountId]
-        );
-
-        if (empty($friendships)) {
-            return [];
-        }
-
-        $friendIds = [$accountId];
-        foreach ($friendships as $friendship) {
-            $friendIds[] = ($friendship["person1"] == $accountId) ? $friendship["person2"] : $friendship["person1"];
-        }
-
-        $placeholders = implode(",", array_fill(0, count($friendIds), "?"));
-        
-        return $this->db->fetchAll(
-            "SELECT * FROM users WHERE extID IN ($placeholders) ORDER BY stars DESC",
-            $friendIds
-        );
-    }
-
-    public function update(int $accountId, int $userId, string $hostname): string {
-        return "lol";
-    }
-}
