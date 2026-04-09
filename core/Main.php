@@ -109,7 +109,7 @@
             return $diffs[$difficulty];
         }
 
-        public function get_difficulty(int $stars = 0, string $name = "N/A", string $type = "name"): array {
+        public function get_difficulty(int $stars = 0, string $type = "name", string $name = "N/A"): array {
             switch($type) {
                 case "name":
                     $auto = ($name == "auto") ? 1 : 0;
@@ -289,7 +289,7 @@
             $query = $this->connection->prepare("UPDATE levels SET starDemon = :demon, starAuto = :auto, starDifficulty = :diff, starStars = :stars, rateDate = :now WHERE levelID = :levelID");	
             $query->execute([':demon' => $demon, ':auto' => $auto, ':diff' => $difficulty, ':stars' => $stars, ':levelID'=>$levelID, ':now' => time()]);
             
-            $diff = $this->get_difficulty($stars, "", "stars");
+            $diff = $this->get_difficulty($stars, "stars");
             
             $query = $this->connection->prepare("INSERT INTO modactions (type, value, value2, value3, timestamp, account) VALUES ('1', :value, :value2, :levelID, :timestamp, :id)");
             $query->execute([':value' => $diff["name"], ':timestamp' => time(), ':id' => $accountID, ':value2' => $stars, ':levelID' => $levelID]);

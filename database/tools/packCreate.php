@@ -55,7 +55,7 @@
 				$levelstring = substr($levelstring,0,-2);
 				$difficulty = 0;
 
-				$pack_difficulty = $main->get_difficulty($stars, "", "stars");
+				$pack_difficulty = $main->get_difficulty($stars, "stars");
 				$difficulty = $pack_difficulty["difficulty"] / 10;
 					
 				$query = $db->prepare("INSERT INTO mappacks (name, levels, stars, coins, difficulty, rgbcolors) VALUES (:name, :levels, :stars, :coins, :difficulty, :rgbcolors)");

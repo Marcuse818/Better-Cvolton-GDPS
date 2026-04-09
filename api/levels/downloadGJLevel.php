@@ -20,7 +20,7 @@
 		$hostname			    = $Main->get_ip();
 		
 		$Level->binaryVersion	    = (!empty($_POST['binaryVersion'])) ? ExploitPatch::remove($_POST['levelID']) : 0;
-		$Level->gameVersion 	= (!empty($_POST['gameVersion'])) ? ExploitPatch::remove($_POST['gameVersion']) : 1;
+		$Level->gameVersion 		= (!empty($_POST['gameVersion'])) ? ExploitPatch::remove($_POST['gameVersion']) : 1;
 		
 		$downloadLevel = $Level->download($accountID, $levelID, $inc, $extras, $hostname);
 		

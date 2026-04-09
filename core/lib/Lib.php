@@ -58,7 +58,7 @@
 
 			case 4:
 				$rating["demon"] = 5;
-				$this->demon_name = "Insane";
+				$rating['name'] = "Insane";
 
 			case 5:
 				$rating["demon"] = 6;

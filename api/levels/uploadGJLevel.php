@@ -16,7 +16,7 @@
 	$levelID 				= ExploitPatch::remove($_POST['levelID']);
 
 	$levelName 				= ExploitPatch::charclean($_POST['levelName']);
-	$Level->gameVersion		= ExploitPatch::remove($_POST['gameVersion']);
+	$Level->gameVersion		= !empty($_POST["gameVersion"]) ? ExploitPatch::remove($_POST["gameVersion"]) : 0;
 	$Level->binaryVersion	= !empty($_POST["binaryVersion"]) ? ExploitPatch::remove($_POST["binaryVersion"]) : 0;
 	$audioTrack 			= ExploitPatch::remove($_POST['audioTrack']);
 	$levelLength 			= ExploitPatch::remove($_POST['levelLength']);

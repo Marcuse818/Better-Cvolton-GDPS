@@ -114,7 +114,7 @@
                    
                 if (substr_count($songResult, "1~|~".$songID."~|~2") != 0)
                 {
-                    $this->song_result = explode('#', $songResult)[2];
+                    $songResult = explode('#', $songResult)[2];
                 }
                 else
                 {

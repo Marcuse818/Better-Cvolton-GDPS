@@ -18,7 +18,7 @@
 		$levelID 		= ExploitPatch::remove($_POST["levelID"]);
 		$starStars 		= ExploitPatch::remove($_POST["stars"]);
 		$feature 		= ExploitPatch::remove($_POST["feature"]);
-		$difficulty 	= $Main->get_difficulty($starStars, "", "stars");
+		$difficulty 	= $Main->get_difficulty($starStars, "stars");
 
 		$suggestStars = $Level->rateSuggest($accountID, $levelID, $starStars, $feature, $difficulty);
 
