@@ -9,7 +9,7 @@
     class Main extends SecurityConfig {
         private $connection;
         private $friends, $max_permission, $role_id_list;
-        private $id, $user_id;
+        private int $id, $user_id;
 
         public function __construct() {
             $new_con = new Database();
@@ -100,14 +100,6 @@
             
             return $list_levels->fetchColumn();
         }
-        
-        public function get_list_difficulty_name($difficulty) {
-            if ($difficulty == -1) return "N/A";
-            
-            $diffs = ['Auto', 'Easy', 'Normal', 'Hard', 'Harder', 'Insane', 'Easy Demon', 'Medium Demon', 'Hard Demon', 'Insane Demon', 'Extreme Demon'];
-            
-            return $diffs[$difficulty];
-        }
 
         public function get_difficulty(int $stars = 0, string $type = "name", string $name = "N/A"): array {
             switch($type) {
@@ -150,22 +142,22 @@
             return $list_levels_name->fetchColumn();
         }
         
-        public function get_post_id() {
+        public function get_post_id(): int {
             if(!empty($_POST["udid"]) && $_POST['gameVersion'] < 20 && self::$unregisteredSubmissions) 
             {
-                $this->id = ExploitPatch::remove($_POST["udid"]);
-                if(is_numeric($this->id)) exit("-1");
-            }
-            elseif(!empty($_POST["accountID"]) && $_POST["accountID"] != "0")
-            {
-                $this->id = GJPCheck::getAccountIDOrDie();
-            }
-            else
-            {
-                exit("-1");
-            }
+                $this->id = (int) ExploitPatch::remove($_POST["udid"]);
+                if(is_numeric($this->id)) exit(-1);
 
-            return $this->id;
+                return $this->id;
+            }
+            
+            if(!empty($_POST["accountID"]) && $_POST["accountID"] != "0")
+            {
+                $this->id = (int) GJPCheck::getAccountIDOrDie();
+                return $this->id;
+            }
+           
+            exit(-1);
         }
 
         public function get_ip() {
@@ -196,14 +188,12 @@
             if ($query->rowCount() > 0) 
             {
                 $this->user_id = $query->fetchColumn();
+                return $this->user_id;
             } 
-            else 
-            {
-                $query = $this->connection->prepare("INSERT INTO users (isRegistered, extID, userName, lastPlayed) VALUES (:register, :id, :userName, :uploadDate)");
-    
-                $query->execute([':id' => $extID, ':register' => $register, ':userName' => $userName, ':uploadDate' => time()]);
-                $this->user_id = $this->connection->lastInsertId();
-            }
+            
+            $query = $this->connection->prepare("INSERT INTO users (isRegistered, extID, userName, lastPlayed) VALUES (:register, :id, :userName, :uploadDate)");
+            $query->execute([':id' => $extID, ':register' => $register, ':userName' => $userName, ':uploadDate' => time()]);
+            $this->user_id = $this->connection->lastInsertId();
 
             return $this->user_id;
         }
@@ -215,21 +205,16 @@
             $query->execute([':accountID' => $accountID]);
             $result = $query->fetchAll();
 
-            if($query->rowCount() == 0)
-            {
-                return array();
-            }
-            else
-            {
-                foreach($result as &$friendship) {
-                    $person = $friendship["person1"];
+            if($query->rowCount() == 0) return array();
+           
+            foreach($result as &$friendship) {
+                $person = $friendship["person1"];
 
-                    if($friendship["person1"] == $accountID) $person = $friendship["person2"];
+                if($friendship["person1"] == $accountID) $person = $friendship["person2"];
                     
-                    $this->friends[] = $person;
-                }
+                $this->friends[] = $person;
             }
-
+            
             return $this->friends;
         }
 
@@ -317,19 +302,19 @@
         }
 
         public function add_gauntlet_level($gauntlet) {
-            $levels_gauntlet = $this->connection->prepare("SELECT * FROM gauntlets WHERE ID = :gauntlet");
-            $levels_gauntlet->execute([":gauntlet" => $gauntlet]);
-            $levels_gauntlet = $levels_gauntlet->fetchAll(PDO::FETCH_ASSOC);
+            $levels = $this->connection->prepare("SELECT * FROM gauntlets WHERE ID = :gauntlet");
+            $levels->execute([":gauntlet" => $gauntlet]);
+            $levels = $levels->fetchAll(PDO::FETCH_ASSOC);
 
-            foreach ($levels_gauntlet as &$level) {
-                for ($x = 1; $x <= 5; $x++) {
-                    $get_data = $this->connection->prepare('SELECT ID FROM gauntlets WHERE level' . $x . ' = :levelID');
-                    $get_data->execute([':levelID' => $level['level' . $x]]);
-                    $get_data = $get_data->fetch(PDO::FETCH_ASSOC);
+           
+            for ($x = 1; $x <= 5; $x++) {
+                $get_data = $this->connection->prepare('SELECT ID FROM gauntlets WHERE level' . $x . ' = :levelID');
+                $get_data->execute([':levelID' => $levels['level' . $x]]);
+                $get_data = $get_data->fetch(PDO::FETCH_ASSOC);
                 
-                    $this->update_gauntlet_level($get_data['ID'], $x, $level['level' . $x]);
-                }
+                $this->update_gauntlet_level($get_data['ID'], $x, $levels['level' . $x]);
             }
+            
             
             return true;
         }

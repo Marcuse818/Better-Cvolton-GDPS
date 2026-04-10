@@ -97,12 +97,12 @@
             return $level->to_response($this->gameVersion, $this->binaryVersion, $daily, $feaID, (bool) $extras);
         }
 
-        public function getDaily(int $type): string {
+        public function get_daily(int $type): string {
             $data = $this->repo->get_daily($type);
             if (!$data) return "-1";
             
             $daily_id = (int) $data['feaID'];
-	        if($type == 1) $daily_id += 100001;
+	        if ($type == 1) $daily_id += 100001;
             if ($type == 2) $daily_id += 200001;
             
             $midnight = ($type == 1) ? strtotime('next monday') : strtotime('tomorrow 00:00:00');
@@ -110,7 +110,7 @@
             return $daily_id."|".$timeleft;
         }
 
-        public function rateStar(int $accountID, int $levelID, int $starStars): string {
+        public function rate_star(int $accountID, int $levelID, int $starStars): string {
            if (!is_numeric($accountID)) return "-1";
             
             $difficulty = $this->Main->get_difficulty($starStars, "stars");
@@ -132,7 +132,7 @@
             return "-1";
         }
 
-        public function rateDemon(int $accountID, int $levelID, int $rating): string 
+        public function rate_demon(int $accountID, int $levelID, int $rating): string 
         {
             if (!$this->Main->getRolePermission($accountID, "actionRateDemon")) return "-1";
             
@@ -142,7 +142,7 @@
             return (string) $levelID;
         }
 
-        public function rateSuggest(int $accountID, int $levelID, int $starStars, int $feature, array $difficulty): string {
+        public function rate_suggest(int $accountID, int $levelID, int $starStars, int $feature, array $difficulty): string {
             if ($this->Main->getRolePermission($accountID, "actionRateStars"))
             {
                 $this->Main->rate_level($accountID, $levelID, $starStars, $difficulty["difficulty"], $difficulty["auto"], $difficulty["demon"]);
@@ -181,102 +181,33 @@
                 }
             }
 
-            if ($this->repo->description($levelDescription, $accountID, $levelDescription)) {
+            if ($this->repo->description($levelID, $accountID, $levelDescription)) {
                 return "1";
             }
 
             return "-1";
         }
 
-        public function upload(
-            int $accountID, 
-            int $levelID, 
-            $userName,
-            $hostname,
-            $userID,
-            $levelName,
-            $audioTrack,
-            $levelLength,
-            $secret,
-            $levelString,
-            $gjp,
-            $levelVersion,
-            $ts,
-            $songs,
-            $sfxs,
-            $auto,
-            $original,
-            $twoPlayer,
-            $songID,
-            $object,
-            $coins,
-            $requestedStars,
-            $extraString,
-            $levelInfo,
-            $unlisted,
-            $unlisted2,
-            $ldm,
-            $wt,
-            $wt2,
-            $settingsString,
-            $levelDescription,
-            $password
-        ): int {
-            $data = new LevelUploadDTO();
-            $data->accountID = $accountID;
-            $data->levelID = $levelID;
-            $data->userName = $userName;
-            $data->hostname = $hostname;
-            $data->userID = $userID;
-            $data->levelName = $levelName;
-            $data->audioTrack = (int) $audioTrack;
-            $data->levelLength = (int) $levelLength;
-            $data->secret = (int) $secret;
-            $data->levelString = $levelString;
-            $data->gjp = $gjp;
-            $data->levelVersion = (int) $levelVersion;
-            $data->ts = (int) $ts;
-            $data->songs = $songs;
-            $data->sfxs = $sfxs;
-            $data->auto = (int) $auto;
-            $data->original = (int) $original;
-            $data->twoPlayer = (int) $twoPlayer;
-            $data->songID = (int) $songID;
-            $data->object = (int) $object;
-            $data->coins = (int) $coins;
-            $data->requestedStars = (int) $requestedStars;
-            $data->extraString = $extraString;
-            $data->levelInfo = $levelInfo;
-            $data->unlisted = (int) $unlisted;
-            $data->unlisted2 = (int) $unlisted2;
-            $data->ldm = (int) $ldm;
-            $data->wt = (int) $wt;
-            $data->wt2 = (int) $wt2;
-            $data->settingsString = $settingsString;
-            $data->levelDescription = $levelDescription;
-            $data->password = (int) $password;
-            $data->gameVersion = $this->gameVersion;
-            $data->binaryVersion = $this->binaryVersion;
+        public function upload(LevelUploadDTO $data): int {
+            if ($this->repo->get_recent_upload($data->userID, $data->hostname) > 0) return -1;
+            if (empty($data->levelString) || empty($data->levelName)) return -1;
 
-            if ($this->repo->get_recent_upload($userID, $hostname) > 0) return "-1";
-            if (empty($levelString) || empty($levelName)) return "-1";
-
-            $extID = $this->repo->get_by_name($levelName, $userID);
+            $extID = $this->repo->get_by_name($data->levelName, $data->userID);
 
             if ($extID !== null) {
                 if ($this->repo->update($data, $extID)) {
-                    file_put_contents(__DIR__."/../database/data/levels/$extID", $levelString);
+                    file_put_contents(__DIR__."/../database/data/levels/$extID", $data->levelString);
                     return $extID;
                 }
             } 
             else {
                 $newID = $this->repo->create($data);
                 if ($newID > 0) {
-                    file_put_contents(__DIR__."/../database/data/levels/$newID", $levelString);
+                    file_put_contents(__DIR__."/../database/data/levels/$newID", $data->levelString);
                     return $newID;
                 }
             }
 
-            return "-1";
+            return -1;
         }
     }

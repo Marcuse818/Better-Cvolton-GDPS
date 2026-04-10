@@ -20,7 +20,7 @@
 		$feature 		= ExploitPatch::remove($_POST["feature"]);
 		$difficulty 	= $Main->get_difficulty($starStars, "stars");
 
-		$suggestStars = $Level->rateSuggest($accountID, $levelID, $starStars, $feature, $difficulty);
+		$suggestStars = $Level->rate_suggest($accountID, $levelID, $starStars, $feature, $difficulty);
 
 		exit($suggestStars);
 	}

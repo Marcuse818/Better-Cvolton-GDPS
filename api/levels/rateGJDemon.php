@@ -19,7 +19,7 @@
 		$levelID 			= ExploitPatch::remove($_POST["levelID"]);
 		$rating 			= ExploitPatch::remove($_POST["rating"]);
 	
-		$rateDemon = $Level->rateDemon($accountID, $levelID, $rating);
+		$rateDemon = $Level->rate_demon($accountID, $levelID, $rating);
 		
 		exit($rateDemon);
 	}

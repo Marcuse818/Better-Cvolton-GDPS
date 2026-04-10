@@ -18,7 +18,7 @@
 		$levelID 	= ExploitPatch::remove($_POST["levelID"]);
 		$starStars 	= ExploitPatch::remove($_POST["stars"]);
 		
-		$rateLevel = $Level->rateStar($accountID, $levelID, $starStars);
+		$rateLevel = $Level->rate_star($accountID, $levelID, $starStars);
 
 		exit($rateLevel);	
 	}

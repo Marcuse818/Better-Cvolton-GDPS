@@ -7,7 +7,7 @@
 
 	$type = !empty($_POST['weekly']) ? $_POST['weekly'] : 0;
 
-	$dailyLevel = $Level->getDaily($type);
+	$dailyLevel = $Level->get_daily($type);
 
 	exit($dailyLevel);
 ?>
